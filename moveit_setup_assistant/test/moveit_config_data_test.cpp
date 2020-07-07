@@ -67,7 +67,7 @@ protected:
       xml_file.close();
       urdf_model = urdf::parseURDF(xml_string);
     }
-    res_path(ros::package::getPath("moveit_resources_panda_moveit_config"));
+    res_path = ros::package::getPath("moveit_resources_panda_moveit_config");
     srdf_model->initFile(*urdf_model, (res_path / "config/panda.srdf").string());
     robot_model.reset(new moveit::core::RobotModel(urdf_model, srdf_model));
   };

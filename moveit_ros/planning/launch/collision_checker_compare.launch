@@ -2,7 +2,7 @@
   <arg name="visualization" default="false" doc="turns on and off visualization with rviz"/>
 
   <!-- send Panda urdf to parameter server -->
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find franka_description)/robots/panda_arm_hand.urdf.xacro'" />
+  <param name="robot_description" textfile="$(find moveit_resources_panda_description)/urdf/panda.urdf" />
 
   <include file="$(find moveit_resources_panda_moveit_config)/launch/planning_context.launch"/>
 
