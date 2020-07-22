@@ -1,0 +1,9 @@
+geometry_msgs/Pose object_pose
+shape_msgs/SolidPrimitive object_shape
+---
+bool success
+---
+geometry_msgs/Pose pregrasp_pose
+geometry_msgs/Pose approach_pose
+geometry_msgs/Pose lift_pose
+geometry_msgs/Pose retreat_pose

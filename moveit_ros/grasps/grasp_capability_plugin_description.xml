@@ -1,0 +1,9 @@
+<library path="libmoveit_move_group_grasp_capability">
+
+  <class name="move_group/MoveGroupGraspAction" type="move_group::MoveGroupGraspAction" base_class_type="move_group::MoveGroupCapability">
+    <description>
+      Provide grasp capability using moveit_grasp to MoveGroup
+    </description>
+  </class>
+
+</library>

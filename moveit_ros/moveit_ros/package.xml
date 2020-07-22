@@ -27,6 +27,7 @@
   <exec_depend>moveit_ros_planning_interface</exec_depend>
   <exec_depend>moveit_ros_visualization</exec_depend>
   <exec_depend>moveit_ros_manipulation</exec_depend>
+  <exec_depend>moveit_ros_grasp</exec_depend>
   <exec_depend>moveit_ros_move_group</exec_depend>
 
   <export>
