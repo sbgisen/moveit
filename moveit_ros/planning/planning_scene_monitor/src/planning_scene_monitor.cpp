@@ -1103,14 +1103,14 @@ void PlanningSceneMonitor::stopWorldGeometryMonitor()
 
 void PlanningSceneMonitor::startOctomapMonitor()
 {
-  if(octomap_monitor_){
+  if(octomap_monitor_ && !enable_update_){
     octomap_monitor_->enableMonitor(true);
     enable_update_ = true;
   }
 }
 void PlanningSceneMonitor::stopOctomapMonitor()
 {
-  if(octomap_monitor_){
+  if(octomap_monitor_ && enable_update_){
     octomap_monitor_->enableMonitor(false);
     enable_update_ = false;
   }
