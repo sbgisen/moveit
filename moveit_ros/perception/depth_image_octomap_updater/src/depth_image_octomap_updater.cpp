@@ -57,6 +57,8 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , filtered_label_transport_(nh_)
   , image_topic_("depth")
   , queue_size_(5)
+  , enable_update_(true)
+  , clear_octomap_(false)
   , near_clipping_plane_distance_(0.3)
   , far_clipping_plane_distance_(5.0)
   , shadow_threshold_(0.04)
@@ -151,6 +153,16 @@ void DepthImageOctomapUpdater::stop()
   stopHelper();
 }
 
+void DepthImageOctomapUpdater::enable(bool flag, bool clear_octomap)
+{
+  enable_update_ = flag;
+  clear_octomap_ = clear_octomap;
+  if(!enable_update_ && clear_octomap_)
+    mesh_filter_->parameters().setDepthRange(0.0, 0.0);
+  else
+    mesh_filter_->parameters().setDepthRange(near_clipping_plane_distance_, far_clipping_plane_distance_);
+}
+
 void DepthImageOctomapUpdater::stopHelper()
 {
   sub_depth_image_.shutdown();
@@ -214,6 +226,9 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   ROS_DEBUG("Received a new depth image message (frame = '%s', encoding='%s')", depth_msg->header.frame_id.c_str(),
             depth_msg->encoding.c_str());
   ros::WallTime start = ros::WallTime::now();
+  
+  if(!enable_update_ && !clear_octomap_)
+    return;
 
   if (max_update_rate_ > 0)
   {

@@ -136,7 +136,7 @@ PlanningSceneMonitor::PlanningSceneMonitor(const robot_model_loader::RobotModelL
 PlanningSceneMonitor::PlanningSceneMonitor(const planning_scene::PlanningScenePtr& scene,
                                            const robot_model_loader::RobotModelLoaderPtr& rm_loader,
                                            const std::shared_ptr<tf2_ros::Buffer>& tf_buffer, const std::string& name)
-  : monitor_name_(name), nh_("~"), tf_buffer_(tf_buffer), rm_loader_(rm_loader)
+  : monitor_name_(name), nh_("~"), tf_buffer_(tf_buffer), rm_loader_(rm_loader), enable_update_(true)
 {
   root_nh_.setCallbackQueue(&queue_);
   nh_.setCallbackQueue(&queue_);
@@ -537,6 +537,8 @@ void PlanningSceneMonitor::newPlanningSceneCallback(const moveit_msgs::PlanningS
 
 void PlanningSceneMonitor::clearOctomap()
 {
+  if(!enable_update_)
+    octomap_monitor_->enableMonitor(false, true);
   octomap_monitor_->getOcTreePtr()->lockWrite();
   octomap_monitor_->getOcTreePtr()->clear();
   octomap_monitor_->getOcTreePtr()->unlockWrite();
@@ -1097,6 +1099,21 @@ void PlanningSceneMonitor::stopWorldGeometryMonitor()
   }
   if (octomap_monitor_)
     octomap_monitor_->stopMonitor();
+}
+
+void PlanningSceneMonitor::startOctomapMonitor()
+{
+  if(octomap_monitor_){
+    octomap_monitor_->enableMonitor(true);
+    enable_update_ = true;
+  }
+}
+void PlanningSceneMonitor::stopOctomapMonitor()
+{
+  if(octomap_monitor_){
+    octomap_monitor_->enableMonitor(false);
+    enable_update_ = false;
+  }
 }
 
 void PlanningSceneMonitor::startStateMonitor(const std::string& joint_states_topic,

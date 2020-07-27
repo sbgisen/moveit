@@ -50,6 +50,8 @@ namespace occupancy_map_monitor
 PointCloudOctomapUpdater::PointCloudOctomapUpdater()
   : OccupancyMapUpdater("PointCloudUpdater")
   , private_nh_("~")
+  , enable_update_(true)
+  , clear_octomap_(false)
   , scale_(1.0)
   , padding_(0.0)
   , max_range_(std::numeric_limits<double>::infinity())
@@ -136,6 +138,12 @@ void PointCloudOctomapUpdater::stop()
   point_cloud_subscriber_ = nullptr;
 }
 
+void PointCloudOctomapUpdater::enable(bool flag, bool clear_octomap)
+{
+  enable_update_ = flag;
+  clear_octomap_ = clear_octomap;
+}
+
 ShapeHandle PointCloudOctomapUpdater::excludeShape(const shapes::ShapeConstPtr& shape)
 {
   ShapeHandle h = 0;
@@ -171,6 +179,9 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
 {
   ROS_DEBUG("Received a new point cloud message");
   ros::WallTime start = ros::WallTime::now();
+
+  if(!enable_update_ && !clear_octomap_)
+    return;
 
   if (max_update_rate_ > 0)
   {
@@ -219,7 +230,11 @@ void PointCloudOctomapUpdater::cloudMsgCallback(const sensor_msgs::PointCloud2::
   }
 
   /* mask out points on the robot */
-  shape_mask_->maskContainment(*cloud_msg, sensor_origin_eigen, 0.0, max_range_, mask_);
+  // if update is disable, the max range is set to 0, which is equivalent to clearing all points
+  if(!enable_update_)
+      shape_mask_->maskContainment(*cloud_msg, sensor_origin_eigen, 0.0, 0.0, mask_);
+  else
+      shape_mask_->maskContainment(*cloud_msg, sensor_origin_eigen, 0.0, max_range_, mask_);
   updateMask(*cloud_msg, sensor_origin_eigen, mask_);
 
   octomap::KeySet free_cells, occupied_cells, model_cells, clip_cells;

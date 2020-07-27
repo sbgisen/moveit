@@ -66,4 +66,10 @@
     </description>
   </class>
 
+  <class name="move_group/SetOctomapMonitorService" type="move_group::SetOctomapMonitorService" base_class_type="move_group::MoveGroupCapability">
+    <description>
+      Provide a ROS service that allows for setting the octomap monitor
+    </description>
+  </class>
+
 </library>

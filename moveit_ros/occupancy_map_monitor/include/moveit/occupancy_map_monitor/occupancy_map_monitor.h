@@ -70,6 +70,8 @@ public:
 
   void stopMonitor();
 
+  void enableMonitor(bool flag, bool clear_octomap=false);
+
   /** @brief Get a pointer to the underlying octree for this monitor. Lock the tree before reading or writing using this
    *  pointer. The value of this pointer stays the same throughout the existance of the monitor instance. */
   const OccMapTreePtr& getOcTreePtr()

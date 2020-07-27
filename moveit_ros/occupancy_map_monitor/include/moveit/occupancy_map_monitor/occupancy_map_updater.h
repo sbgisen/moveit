@@ -79,6 +79,8 @@ public:
 
   virtual void stop() = 0;
 
+  virtual void enable(bool flag, bool clear_octomap) = 0;
+
   virtual ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape) = 0;
 
   virtual void forgetShape(ShapeHandle handle) = 0;

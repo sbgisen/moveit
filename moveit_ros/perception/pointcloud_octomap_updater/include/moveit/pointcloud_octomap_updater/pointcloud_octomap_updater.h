@@ -60,6 +60,7 @@ public:
   bool initialize() override;
   void start() override;
   void stop() override;
+  void enable(bool flag, bool clear_octomap) override;
   ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape) override;
   void forgetShape(ShapeHandle handle) override;
 
@@ -79,6 +80,9 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   ros::Time last_update_time_;
+
+  bool enable_update_;
+  bool clear_octomap_;
 
   /* params */
   std::string point_cloud_topic_;

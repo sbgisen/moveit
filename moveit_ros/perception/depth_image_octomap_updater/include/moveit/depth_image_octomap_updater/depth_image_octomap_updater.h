@@ -58,6 +58,7 @@ public:
   bool initialize() override;
   void start() override;
   void stop() override;
+  void enable(bool flag, bool clear_octomap) override;
   ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape) override;
   void forgetShape(ShapeHandle handle) override;
 
@@ -79,6 +80,9 @@ private:
   image_transport::CameraPublisher pub_filtered_label_image_;
 
   ros::Time last_update_time_;
+
+  bool enable_update_;
+  bool clear_octomap_;
 
   std::string filtered_cloud_topic_;
   std::string sensor_type_;

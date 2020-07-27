@@ -367,6 +367,12 @@ public:
   /** @brief Stop the world geometry monitor */
   void stopWorldGeometryMonitor();
 
+  /** @brief Start the octomap monitor */
+  void startOctomapMonitor();
+
+  /** @brief Stop the octomap monitor */
+  void stopOctomapMonitor();
+
   /** @brief Add a function to be called when an update to the scene is received */
   void addUpdateCallback(const boost::function<void(SceneUpdateType)>& fn);
 
@@ -469,6 +475,8 @@ protected:
   boost::shared_mutex scene_update_mutex_;         /// mutex for stored scene
   ros::Time last_update_time_;                     /// Last time the state was updated
   ros::Time last_robot_motion_time_;               /// Last time the robot has moved
+
+  bool enable_update_;
 
   ros::NodeHandle nh_;
   ros::NodeHandle root_nh_;

@@ -353,6 +353,12 @@ void OccupancyMapMonitor::stopMonitor()
     map_updaters_[i]->stop();
 }
 
+void OccupancyMapMonitor::enableMonitor(bool flag, bool clear_octomap)
+{
+  for (std::size_t i = 0; i < map_updaters_.size(); ++i)
+    map_updaters_[i]->enable(flag, clear_octomap);
+}
+
 OccupancyMapMonitor::~OccupancyMapMonitor()
 {
   stopMonitor();
