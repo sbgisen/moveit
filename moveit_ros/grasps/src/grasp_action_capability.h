@@ -26,17 +26,7 @@
 #include <moveit_grasps/grasp_planner.h>
 
 #include <moveit_ros_grasp/GraspPlanAction.h>
-
-// MoveIt
-/*
-#include <moveit/robot_state/robot_state.h>
-#include <moveit/move_group_interface/move_group_interface.h>
-#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
-#include <moveit/kinematic_constraints/utils.h>
-#include <moveit/planning_interface/planning_interface.h>
-#include <moveit/planning_pipeline/planning_pipeline.h>
-#include <moveit/robot_state/conversions.h>
-*/
+#include "crop_octomap/CropObject.h"
 
 namespace move_group
 {
@@ -93,6 +83,7 @@ private:
 
   MoveGroupState grasp_state_;
   //void setGraspState(MoveGroupState state);
+  ros::Publisher client_;
 
 };
 }

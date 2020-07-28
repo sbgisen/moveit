@@ -19,6 +19,7 @@
   <build_depend>moveit_ros_move_group</build_depend>
   <build_depend>moveit_grasps</build_depend>
   <build_depend>moveit_grasps_filter</build_depend>
+  <build_depend>crop_octomap</build_depend>
 
   <build_export_depend>moveit_grasps</build_export_depend>
   <build_export_depend>moveit_grasps_filter</build_export_depend>

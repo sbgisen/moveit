@@ -30,6 +30,8 @@ void move_group::MoveGroupGraspAction::initialize()
     loadVisual();
     setupGraspPipeline();
 
+    client_ = root_node_handle_.advertise<crop_octomap::CropObject>("/crop_octomap/crop_object", 1);
+
     grasp_action_server_.reset(new actionlib::SimpleActionServer<moveit_ros_grasp::GraspPlanAction>(
         root_node_handle_, GRASP_ACTION, boost::bind(&MoveGroupGraspAction::executeCB, this, _1), false));
     //grasp_action_server_->registerPreemptCallback(boost::bind(&MoveGroupGraspAction::preemptCB, this));
@@ -105,11 +107,15 @@ void move_group::MoveGroupGraspAction::executeCB(const moveit_ros_grasp::GraspPl
     visual_tools_->removeAllCollisionObjects();
     visual_tools_->trigger();
 
+    //remove object from octomap server
+    crop_octomap::CropObject msg;
+    msg.pose = goal->object_pose;
+    msg.shape = goal->object_shape;
+    client_.publish(msg);
+
     // Plan grasps
-    geometry_msgs::Pose object_pose = goal->object_pose;
-    shape_msgs::SolidPrimitive object_shape = goal->object_shape;
     EigenSTL::vector_Isometry3d waypoints;
-    bool success = generateGraspPlan(waypoints, object_pose, object_shape);
+    bool success = generateGraspPlan(waypoints, goal->object_pose, goal->object_shape);
 
     if(success){
       feedback_.pregrasp_pose = normalizeQuaternion(visual_tools_->convertPose(waypoints[0]));
