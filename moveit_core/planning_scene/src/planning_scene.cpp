@@ -149,10 +149,13 @@ void PlanningScene::initialize()
   if (!nh_.getParam(USE_PADDING_SELF_COLLISIONS_PARAM_NAME, use_padding_self_collisions_))
   {
     use_padding_self_collisions_ = false;
-    ROS_INFO_STREAM("Param '" << USE_PADDING_SELF_COLLISIONS_PARAM_NAME << "' was not set. Using default value: " << use_padding_self_collisions_);
+    ROS_INFO_STREAM("Param '" << USE_PADDING_SELF_COLLISIONS_PARAM_NAME
+                              << "' was not set. Using default value: " << use_padding_self_collisions_);
   }
-  else {
-    ROS_INFO_STREAM("Param '" << USE_PADDING_SELF_COLLISIONS_PARAM_NAME << "' was set to " << use_padding_self_collisions_);
+  else
+  {
+    ROS_INFO_STREAM("Param '" << USE_PADDING_SELF_COLLISIONS_PARAM_NAME << "' was set to "
+                              << use_padding_self_collisions_);
   }
 
   scene_transforms_ = std::make_shared<SceneTransforms>(this);
@@ -502,13 +505,15 @@ void PlanningScene::checkCollision(const collision_detection::CollisionRequest& 
   // check collision with the world using the padded version
   getCollisionEnv()->checkRobotCollision(req, res, robot_state, acm);
 
-  // do self-collision checking with the unpadded version of the robot - unless otherwise specified    
+  // do self-collision checking with the unpadded version of the robot - unless otherwise specified
   if (!res.collision || (req.contacts && res.contacts.size() < req.max_contacts))
   {
-    if ( use_padding_self_collisions_ ) {
+    if (use_padding_self_collisions_)
+    {
       getCollisionEnv()->checkSelfCollision(req, res, robot_state, acm);
     }
-    else {
+    else
+    {
       getCollisionEnvUnpadded()->checkSelfCollision(req, res, robot_state, acm);
     }
   }
@@ -531,13 +536,15 @@ void PlanningScene::checkCollisionUnpadded(const collision_detection::CollisionR
   // check collision with the world using the unpadded version
   getCollisionEnvUnpadded()->checkRobotCollision(req, res, robot_state, acm);
 
-  // do self-collision checking with the unpadded version of the robot - unless otherwise specified    
+  // do self-collision checking with the unpadded version of the robot - unless otherwise specified
   if (!res.collision || (req.contacts && res.contacts.size() < req.max_contacts))
   {
-    if ( use_padding_self_collisions_ ) {
+    if (use_padding_self_collisions_)
+    {
       getCollisionEnv()->checkSelfCollision(req, res, robot_state, acm);
     }
-    else {
+    else
+    {
       getCollisionEnvUnpadded()->checkSelfCollision(req, res, robot_state, acm);
     }
   }

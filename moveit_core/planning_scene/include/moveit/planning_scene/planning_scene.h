@@ -1145,7 +1145,7 @@ private:
   // a map of object types
   std::unique_ptr<ObjectTypeMap> object_types_;
 
-  // used to specify if padded version of robot should also be used for self-collisions - disabled by default 
+  // used to specify if padded version of robot should also be used for self-collisions - disabled by default
   bool use_padding_self_collisions_;
   static const std::string USE_PADDING_SELF_COLLISIONS_PARAM_NAME;
 
