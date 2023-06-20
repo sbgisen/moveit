@@ -580,7 +580,7 @@ bool ServoCalcs::convertDeltasToOutgoingCmd(trajectory_msgs::JointTrajectory& jo
 
   composeJointTrajMessage(internal_joint_state_, joint_trajectory);
 
-  if (!enforcePositionLimits())
+  if (!enforcePositionLimits(internal_joint_state_))
   {
     suddenHalt(joint_trajectory);
     status_ = StatusCode::JOINT_BOUND;
@@ -721,9 +721,8 @@ double ServoCalcs::velocityScalingFactorForSingularity(const Eigen::VectorXd& co
 
   Eigen::JacobiSVD<Eigen::MatrixXd> new_svd(new_jacobian);
   double new_condition = new_svd.singularValues()(0) / new_svd.singularValues()(new_svd.singularValues().size() - 1);
-  // If new_condition < ini_condition, the singular vector does point towards a
-  // singularity. Otherwise, flip its direction.
-  if (ini_condition >= new_condition)
+  // If new_condition < ini_condition, the singular vector points away from the singularity. If so, flip its direction.
+  if (new_condition < ini_condition)
   {
     vector_toward_singularity *= -1;
   }
@@ -779,7 +778,7 @@ void ServoCalcs::enforceVelLimits(Eigen::ArrayXd& delta_theta)
   delta_theta = velocity_scaling_factor * velocity * parameters_.publish_period;
 }
 
-bool ServoCalcs::enforcePositionLimits()
+bool ServoCalcs::enforcePositionLimits(sensor_msgs::JointState& joint_state)
 {
   bool halting = false;
 
@@ -797,14 +796,18 @@ bool ServoCalcs::enforcePositionLimits()
     }
     if (!current_state_->satisfiesPositionBounds(joint, -parameters_.joint_limit_margin))
     {
-      const std::vector<moveit_msgs::JointLimits> limits = joint->getVariableBoundsMsg();
+      const std::vector<moveit_msgs::JointLimits>& limits = joint->getVariableBoundsMsg();
 
       // Joint limits are not defined for some joints. Skip them.
       if (!limits.empty())
       {
-        if ((current_state_->getJointVelocities(joint)[0] < 0 &&
+        // Check if pending velocity command is moving in the right direction
+        auto joint_itr = std::find(joint_state.name.begin(), joint_state.name.end(), joint->getName());
+        auto joint_idx = std::distance(joint_state.name.begin(), joint_itr);
+
+        if ((joint_state.velocity.at(joint_idx) < 0 &&
              (joint_angle < (limits[0].min_position + parameters_.joint_limit_margin))) ||
-            (current_state_->getJointVelocities(joint)[0] > 0 &&
+            (joint_state.velocity.at(joint_idx) > 0 &&
              (joint_angle > (limits[0].max_position - parameters_.joint_limit_margin))))
         {
           ROS_WARN_STREAM_THROTTLE_NAMED(ROS_LOG_THROTTLE_PERIOD, LOGNAME,

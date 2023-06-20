@@ -204,7 +204,7 @@ private:
   /**
    * @brief set MotionPlanResponse from joint trajectory
    */
-  void setSuccessResponse(const std::string& group_name, const moveit_msgs::RobotState& start_state,
+  void setSuccessResponse(const moveit::core::RobotState& start_rs, const std::string& group_name,
                           const trajectory_msgs::JointTrajectory& joint_trajectory, const ros::Time& planning_start,
                           planning_interface::MotionPlanResponse& res) const;
 
@@ -223,7 +223,7 @@ private:
    *     - The start state velocity is below
    * TrajectoryGenerator::VELOCITY_TOLERANCE
    */
-  void checkStartState(const moveit_msgs::RobotState& start_state) const;
+  void checkStartState(const moveit_msgs::RobotState& start_state, const std::string& group) const;
 
   void checkGoalConstraints(const moveit_msgs::MotionPlanRequest::_goal_constraints_type& goal_constraints,
                             const std::vector<std::string>& expected_joint_names, const std::string& group_name) const;
@@ -234,11 +234,12 @@ private:
 
   void checkCartesianGoalConstraint(const moveit_msgs::Constraints& constraint, const std::string& group_name) const;
 
-  void convertToRobotTrajectory(const trajectory_msgs::JointTrajectory& joint_trajectory,
-                                const moveit_msgs::RobotState& start_state,
-                                robot_trajectory::RobotTrajectory& robot_trajectory) const;
-
 private:
+  /**
+   * @return joint state message including only active joints in group
+   */
+  sensor_msgs::JointState filterGroupValues(const sensor_msgs::JointState& robot_state, const std::string& group) const;
+
   /**
    * @return True if scaling factor is valid, otherwise false.
    */

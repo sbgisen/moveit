@@ -1,35 +1,19 @@
 cmake_minimum_required(VERSION 3.1.3)
 project(moveit_core)
 
-if(NOT "${CMAKE_CXX_STANDARD}")
-  set(CMAKE_CXX_STANDARD 14)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  # Enable warnings
-  add_compile_options(-Wall -Wextra
-    -Wwrite-strings -Wunreachable-code -Wpointer-arith -Wredundant-decls -Wcast-qual
-    -Wno-unused-parameter -Wno-unused-function)
-endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  # This too often has false-positives
+  # Silent these warnings. They are too often false-positives.
+  message("TODO: Analyse and fix gcc's maybe-uninitialized warnings")
   add_compile_options(-Wno-maybe-uninitialized)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
-
-if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
-  message("${PROJECT_NAME}: You did not request a specific build type: Choosing 'Release' for maximum performance")
-  set(CMAKE_BUILD_TYPE Release)
-endif()
+include(cmake/moveit.cmake)
+moveit_build_options()
 
 find_package(Boost REQUIRED system filesystem date_time thread iostreams regex ${EXTRA_BOOST_COMPONENTS})
 find_package(Eigen3 REQUIRED)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
-
 # TODO: Move collision detection into separate packages
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(Bullet 2.87)
 
 # TODO(j-petit): Version check can be dropped when Xenial reaches end-of-life
@@ -67,6 +51,14 @@ else()
 endif()
 
 find_package(octomap REQUIRED)
+
+find_package(ruckig REQUIRED)
+# work around catkin_package not fetching the interface includes from the target
+# to forward to downstream dependencies. The includes do not need to be added
+# in include_directories below because the target is correctly imported here.
+get_target_property(ruckig_INCLUDE_DIRS ruckig::ruckig INTERFACE_INCLUDE_DIRECTORIES)
+set(ruckig_LIBRARIES "ruckig::ruckig")
+
 find_package(urdfdom REQUIRED)
 find_package(urdfdom_headers REQUIRED)
 
@@ -184,9 +176,12 @@ catkin_package(
     EIGEN3
     LIBFCL
     OCTOMAP
+    ruckig
     urdfdom
     urdfdom_headers
     ${BULLET_ENABLE}
+  CFG_EXTRAS
+    moveit.cmake
     )
 
 if (WIN32)
@@ -207,17 +202,6 @@ include_directories(SYSTEM ${catkin_INCLUDE_DIRS}
 #catkin_lint: ignore_once external_directory  (${VERSION_FILE_PATH})
 include_directories(${THIS_PACKAGE_INCLUDE_DIRS}
                     ${VERSION_FILE_PATH})
-
-# Generate and install version.h
-string(REGEX REPLACE "^([0-9]+)\\..*" "\\1" MOVEIT_VERSION_MAJOR "${${PROJECT_NAME}_VERSION}")
-string(REGEX REPLACE "^[0-9]+\\.([0-9]+).*" "\\1" MOVEIT_VERSION_MINOR "${${PROJECT_NAME}_VERSION}")
-string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" MOVEIT_VERSION_PATCH "${${PROJECT_NAME}_VERSION}")
-set(MOVEIT_VERSION_EXTRA "Alpha")
-set(MOVEIT_VERSION "${MOVEIT_VERSION_MAJOR}.${MOVEIT_VERSION_MINOR}.${MOVEIT_VERSION_PATCH}-${MOVEIT_VERSION_EXTRA}")
-message(STATUS " *** Building MoveIt ${MOVEIT_VERSION} ***")
-configure_file("version/version.h.in" "${VERSION_FILE_PATH}/moveit/version.h")
-#catkin_lint: ignore_once external_file
-install(FILES "${VERSION_FILE_PATH}/moveit/version.h" DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}/moveit)
 
 add_subdirectory(version)
 add_subdirectory(macros)

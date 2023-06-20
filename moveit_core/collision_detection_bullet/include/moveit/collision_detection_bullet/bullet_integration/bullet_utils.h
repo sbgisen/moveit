@@ -65,7 +65,7 @@ inline bool acmCheck(const std::string& body_1, const std::string& body_2,
 
   if (acm != nullptr)
   {
-    if (acm->getEntry(body_1, body_2, allowed_type))
+    if (acm->getAllowedCollision(body_1, body_2, allowed_type))
     {
       if (allowed_type == collision_detection::AllowedCollision::Type::NEVER)
       {
@@ -601,8 +601,8 @@ struct BroadphaseContactResultCallback
   }
 
   /** \brief This callback is used after btManifoldResult processed a collision result. */
-  btScalar addSingleResult(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0,
-                           const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1)
+  btScalar addSingleResult(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int /*partId0*/,
+                           int index0, const btCollisionObjectWrapper* colObj1Wrap, int /*partId1*/, int index1)
   {
     if (cp.m_distance1 > static_cast<btScalar>(contact_distance_))
     {

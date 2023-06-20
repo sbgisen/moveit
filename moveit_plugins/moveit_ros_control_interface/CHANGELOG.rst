@@ -2,6 +2,32 @@
 Changelog for package moveit_ros_control_interface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.1.12 (2023-05-13)
+-------------------
+* Drop lib/ prefix from plugin paths (`#3305 <https://github.com/ros-planning/moveit/issues/3305>`_)
+* Contributors: Jochen Sprickerhof
+
+1.1.11 (2022-12-21)
+-------------------
+
+1.1.10 (2022-09-13)
+-------------------
+
+1.1.9 (2022-03-06)
+------------------
+
+1.1.8 (2022-01-30)
+------------------
+
+1.1.7 (2021-12-31)
+------------------
+
+1.1.6 (2021-11-06)
+------------------
+* Use newly introduced cmake macro ``moveit_build_options()`` from ``moveit_core``
+* Fix reversed check in switchControllers (`#2726 <https://github.com/ros-planning/moveit/issues/2726>`_)
+* Contributors: Nathan Brooks, Robert Haschke
+
 1.1.5 (2021-05-23)
 ------------------
 

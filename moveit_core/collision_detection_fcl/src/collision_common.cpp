@@ -404,11 +404,11 @@ struct FCLShapeCache
   /** \brief Map of weak pointers to the FCLGeometry. */
   ShapeMap map_;
 
-  /** \brief Counts cache usage and triggers clearing of cache when \m MAX_CLEAN_COUNT is exceeded. */
+  /** \brief Counts cache usage and triggers clearing of cache when \c MAX_CLEAN_COUNT is exceeded. */
   unsigned int clean_count_;
 };
 
-bool distanceCallback(fcl::CollisionObjectd* o1, fcl::CollisionObjectd* o2, void* data, double& min_dist)
+bool distanceCallback(fcl::CollisionObjectd* o1, fcl::CollisionObjectd* o2, void* data, double& /*min_dist*/)
 {
   DistanceData* cdata = reinterpret_cast<DistanceData*>(data);
 

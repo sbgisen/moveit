@@ -61,10 +61,11 @@ public:
    *
    * The name of this body is \e id and it consists of \e shapes that attach to the link by the transforms
    * \e shape_poses. The set of links that are allowed to be touched by this object is specified by \e touch_links.
+   * detach_posture may describe a detach motion for the gripper when placing the object.
    * The shape and subframe poses are relative to the \e pose, and \e pose is relative to the parent link. */
-  AttachedBody(const LinkModel* link, const std::string& id, const Eigen::Isometry3d& pose,
+  AttachedBody(const LinkModel* parent, const std::string& id, const Eigen::Isometry3d& pose,
                const std::vector<shapes::ShapeConstPtr>& shapes, const EigenSTL::vector_Isometry3d& shape_poses,
-               const std::set<std::string>& touch_links, const trajectory_msgs::JointTrajectory& attach_posture,
+               const std::set<std::string>& touch_links, const trajectory_msgs::JointTrajectory& detach_posture,
                const moveit::core::FixedTransformsMap& subframe_poses = moveit::core::FixedTransformsMap());
 
   ~AttachedBody();
@@ -187,7 +188,7 @@ public:
    * The returned transform is guaranteed to be a valid isometry. */
   const Eigen::Isometry3d& getGlobalSubframeTransform(const std::string& frame_name, bool* found = nullptr) const;
 
-  /** \brief Check whether a subframe of given @frame_name is present in this object.
+  /** \brief Check whether a subframe of given \param frame_name is present in this object.
    *
    * The frame_name needs to have the object's name prepended (e.g. "screwdriver/tip" returns true if the object's
    * name is "screwdriver"). */

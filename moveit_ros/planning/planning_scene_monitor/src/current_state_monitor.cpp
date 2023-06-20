@@ -147,8 +147,8 @@ void CurrentStateMonitor::startStateMonitor(const std::string& joint_states_topi
       joint_state_subscriber_ = nh_.subscribe(joint_states_topic, 25, &CurrentStateMonitor::jointStateCallback, this);
     if (tf_buffer_ && !robot_model_->getMultiDOFJointModels().empty())
     {
-      tf_connection_ = std::make_shared<TFConnection>(
-          tf_buffer_->_addTransformsChangedListener(boost::bind(&CurrentStateMonitor::tfCallback, this)));
+      tf_connection_ =
+          std::make_shared<TFConnection>(tf_buffer_->_addTransformsChangedListener([this] { tfCallback(); }));
     }
     state_monitor_started_ = true;
     monitor_start_time_ = ros::Time::now();
@@ -291,7 +291,7 @@ void CurrentStateMonitor::jointStateCallback(const sensor_msgs::JointStateConstP
     boost::mutex::scoped_lock _(state_update_lock_);
     // read the received values, and update their time stamps
     std::size_t n = joint_state->name.size();
-    current_state_time_ = joint_state->header.stamp;
+    current_state_time_ = std::max(current_state_time_, joint_state->header.stamp);
     for (std::size_t i = 0; i < n; ++i)
     {
       const moveit::core::JointModel* jm = robot_model_->getJointModel(joint_state->name[i]);
@@ -301,7 +301,19 @@ void CurrentStateMonitor::jointStateCallback(const sensor_msgs::JointStateConstP
       if (jm->getVariableCount() != 1)
         continue;
 
-      joint_time_[jm] = joint_state->header.stamp;
+      if (auto& joint_time{ joint_time_[jm] }; joint_time < joint_state->header.stamp)
+      {
+        joint_time = joint_state->header.stamp;
+      }
+      else
+      {
+        ROS_WARN_STREAM_NAMED(LOGNAME, "New joint state for joint '"
+                                           << jm->getName()
+                                           << "' is not newer than the previous state. Assuming your rosbag looped.");
+        joint_time_.clear();
+        joint_time_[jm] = joint_state->header.stamp;
+        current_state_time_ = joint_state->header.stamp;
+      }
 
       if (robot_state_.getJointPositions(jm)[0] != joint_state->position[i])
       {
