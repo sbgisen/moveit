@@ -43,6 +43,7 @@
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_model/robot_model.h>
 #include <cv_bridge/cv_bridge.h>
+#include <geometric_shapes/mesh_operations.h>
 
 namespace enc = sensor_msgs::image_encodings;
 static const std::string LOGNAME = "depth_self_filter_nodelet";
@@ -194,6 +195,15 @@ void mesh_filter::DepthSelfFiltering::addMeshes(MeshFilter<StereoCameraModel>& m
         const shapes::Mesh& m = static_cast<const shapes::Mesh&>(*shape);
         MeshHandle mesh_handle = mesh_filter.addMesh(m);
         transform_provider_.addHandle(mesh_handle, link->getName());
+      }
+      else
+      {
+        std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(shape.get()));
+        if (m)
+        {
+          MeshHandle mesh_handle = mesh_filter.addMesh(*m);
+          transform_provider_.addHandle(mesh_handle, link->getName());
+        }
       }
     }
   }
