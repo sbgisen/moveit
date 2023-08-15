@@ -184,24 +184,27 @@ void mesh_filter::DepthSelfFiltering::addMeshes(MeshFilter<StereoCameraModel>& m
 {
   robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
   moveit::core::RobotModelConstPtr robot_model = robot_model_loader.getModel();
-  const auto& links = robot_model->getLinkModelsWithCollisionGeometry();
-  for (auto link : links)
+  const std::vector<const moveit::core::LinkModel*>& links = robot_model->getLinkModelsWithCollisionGeometry();
+  for (const auto& link : links)
   {
-    const auto& shapes = link->getShapes();
-    for (const auto& shape : shapes)
+    const std::vector<shapes::ShapeConstPtr>& shapes = link->getShapes();
+    const EigenSTL::vector_Isometry3d& shapes_origin = link->getCollisionOriginTransforms();
+    for (unsigned int i = 0; i < shapes.size(); ++i)
     {
-      if (shape->type == shapes::MESH)
+      if (shapes[i]->type == shapes::MESH)
       {
-        const shapes::Mesh& m = static_cast<const shapes::Mesh&>(*shape);
-        MeshHandle mesh_handle = mesh_filter.addMesh(m);
+        const shapes::Mesh& mesh = static_cast<const shapes::Mesh&>(*shapes[i]);
+        const Eigen::Isometry3d origin = shapes_origin[i];
+        MeshHandle mesh_handle = mesh_filter.addMesh(mesh, origin);
         transform_provider_.addHandle(mesh_handle, link->getName());
       }
       else
       {
-        std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(shape.get()));
-        if (m)
+        std::unique_ptr<shapes::Mesh> mesh(shapes::createMeshFromShape(shapes[i].get()));
+        if (mesh)
         {
-          MeshHandle mesh_handle = mesh_filter.addMesh(*m);
+          const Eigen::Isometry3d origin = shapes_origin[i];
+          MeshHandle mesh_handle = mesh_filter.addMesh(*mesh, origin);
           transform_provider_.addHandle(mesh_handle, link->getName());
         }
       }

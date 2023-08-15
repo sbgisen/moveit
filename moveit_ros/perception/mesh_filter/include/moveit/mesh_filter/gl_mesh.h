@@ -66,6 +66,8 @@ public:
    */
   GLMesh(const shapes::Mesh& mesh, unsigned int mesh_label);
 
+  GLMesh(const shapes::Mesh& mesh, unsigned int mesh_label, const Eigen::Isometry3d& origin);
+
   /** \brief Destructor*/
   ~GLMesh();
   /**
