@@ -190,9 +190,34 @@ mesh_filter::MeshHandle mesh_filter::MeshFilterBase::addMesh(const shapes::Mesh&
   return ret;
 }
 
+mesh_filter::MeshHandle mesh_filter::MeshFilterBase::addMesh(const shapes::Mesh& mesh, const Eigen::Isometry3d& origin)
+{
+  std::unique_lock<std::mutex> _(meshes_mutex_);
+
+  JobPtr job(new FilterJob<void>([this, &mesh, &origin] { addMeshHelper(next_handle_, mesh, origin); }));
+  addJob(job);
+  job->wait();
+  mesh_filter::MeshHandle ret = next_handle_;
+  const std::size_t sz = min_handle_ + meshes_.size() + 1;
+  for (std::size_t i = min_handle_; i < sz; ++i)
+    if (meshes_.find(i) == meshes_.end())
+    {
+      next_handle_ = i;
+      break;
+    }
+  min_handle_ = next_handle_;
+  return ret;
+}
+
 void mesh_filter::MeshFilterBase::addMeshHelper(MeshHandle handle, const shapes::Mesh& cmesh)
 {
   meshes_[handle] = std::make_shared<GLMesh>(cmesh, handle);
+}
+
+void mesh_filter::MeshFilterBase::addMeshHelper(MeshHandle handle, const shapes::Mesh& cmesh,
+                                                const Eigen::Isometry3d& origin)
+{
+  meshes_[handle] = std::make_shared<GLMesh>(cmesh, handle, origin);
 }
 
 void mesh_filter::MeshFilterBase::removeMesh(MeshHandle handle)

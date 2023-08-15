@@ -101,6 +101,8 @@ public:
    */
   MeshHandle addMesh(const shapes::Mesh& mesh);
 
+  MeshHandle addMesh(const shapes::Mesh& mesh, const Eigen::Isometry3d& origin);
+
   /**
    * \brief removes a mesh given by its handle
    * \author Suat Gedikli (gedikli@willowgarage.com)
@@ -211,6 +213,7 @@ protected:
    * \param[in] cmesh the mesh to be added to the corresponding handle
    */
   void addMeshHelper(MeshHandle handle, const shapes::Mesh& cmesh);
+  void addMeshHelper(MeshHandle handle, const shapes::Mesh& cmesh, const Eigen::Isometry3d& origin);
 
   /**
    * \brief used within a Job to allow the main thread removing meshes
