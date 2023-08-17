@@ -482,9 +482,16 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if(xx == 0 && yy == 0 && zz == 0)
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            // Check if the point is within the specified range
+            if (point_tf.getX() >= -2.0 && point_tf.getX() <= 2.0 && point_tf.getY() >= -2.0 &&
+                point_tf.getY() <= 2.0 && point_tf.getZ() >= 0.1 && point_tf.getZ() <= 2.1)
+            {
+              occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            }
           }
           // on far plane or a model point -> remove
           else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
@@ -492,6 +499,8 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x] * 1e-3;
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if(xx == 0 && yy == 0 && zz == 0)
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             // add to the list of model cells
@@ -511,15 +520,23 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x];
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if(xx == 0 && yy == 0 && zz == 0)
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            if (point_tf.getX() >= -2.0 && point_tf.getX() <= 2.0 && point_tf.getY() >= -2.0 &&
+                point_tf.getY() <= 2.0 && point_tf.getZ() >= 0.1 && point_tf.getZ() <= 2.1)
+            {
+              occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            }
           }
           else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
           {
             float zz = input_row[x];
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if(xx == 0 && yy == 0 && zz == 0)
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             // add to the list of model cells
