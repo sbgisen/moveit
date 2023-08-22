@@ -385,8 +385,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
   octomap::KeySet* occupied_cells_ptr = new octomap::KeySet();
   octomap::KeySet* model_cells_ptr = new octomap::KeySet();
+  octomap::KeySet* free_cells_ptr = new octomap::KeySet();
   octomap::KeySet& occupied_cells = *occupied_cells_ptr;
   octomap::KeySet& model_cells = *model_cells_ptr;
+  octomap::KeySet& free_cells = *free_cells_ptr;
 
   // allocate memory if needed
   std::size_t img_size = h * w;
@@ -482,7 +484,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if(xx == 0 && yy == 0 && zz == 0)
+            if (xx == 0 && yy == 0 && zz == 0)
               continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
@@ -492,6 +494,18 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
+            else
+            {
+              octomap::KeyRay ray;
+              const octomap::point3d target_point(point_tf.getX(), point_tf.getY(), point_tf.getZ());
+              if (tree_->computeRayKeys(sensor_origin, target_point, ray))
+              {
+                for (octomap::KeyRay::iterator it = ray.begin(), end = ray.end(); it != end; ++it)
+                {
+                  free_cells.insert(*it);
+                }
+              }
+            }
           }
           // on far plane or a model point -> remove
           else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
@@ -499,7 +513,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x] * 1e-3;
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if(xx == 0 && yy == 0 && zz == 0)
+            if (xx == 0 && yy == 0 && zz == 0)
               continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
@@ -520,7 +534,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x];
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if(xx == 0 && yy == 0 && zz == 0)
+            if (xx == 0 && yy == 0 && zz == 0)
               continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
@@ -529,13 +543,25 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
+            else
+            {
+              octomap::KeyRay ray;
+              const octomap::point3d target_point(point_tf.getX(), point_tf.getY(), point_tf.getZ());
+              if (tree_->computeRayKeys(sensor_origin, target_point, ray))
+              {
+                for (octomap::KeyRay::iterator it = ray.begin(), end = ray.end(); it != end; ++it)
+                {
+                  free_cells.insert(*it);
+                }
+              }
+            }
           }
           else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
           {
             float zz = input_row[x];
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if(xx == 0 && yy == 0 && zz == 0)
+            if (xx == 0 && yy == 0 && zz == 0)
               continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
@@ -561,6 +587,8 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   tree_->lockWrite();
   try
   {
+    for (const octomap::OcTreeKey& free_cell : free_cells)
+      tree_->updateNode(free_cell, false);
     /* now mark all occupied cells */
     for (const octomap::OcTreeKey& occupied_cell : occupied_cells)
       tree_->updateNode(occupied_cell, true);
