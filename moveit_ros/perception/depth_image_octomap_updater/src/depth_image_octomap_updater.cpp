@@ -36,6 +36,7 @@
 
 #include <moveit/depth_image_octomap_updater/depth_image_octomap_updater.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_monitor.h>
+#include <std_srvs/Empty.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/LinearMath/Vector3.h>
 #include <tf2/LinearMath/Transform.h>
@@ -44,6 +45,8 @@
 #include <XmlRpcException.h>
 #include <stdint.h>
 
+#include <cmath>
+#include <iterator>
 #include <memory>
 
 namespace occupancy_map_monitor
@@ -61,12 +64,15 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , queue_size_(5)
   , near_clipping_plane_distance_(0.3)
   , far_clipping_plane_distance_(5.0)
+  , raytrace_range_(3.0)
+  , occupancy_max_z_(3.0)
   , shadow_threshold_(0.04)
   , padding_scale_(0.0)
   , padding_offset_(0.02)
-  , max_update_rate_(0)
+  , max_update_rate_(10)
   , skip_vertical_pixels_(4)
   , skip_horizontal_pixels_(6)
+  , compression_ratio_(1)
   , image_callback_count_(0)
   , average_callback_dt_(0.0)
   , good_tf_(5)
@@ -96,6 +102,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
 
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
+    readXmlParam(params, "raytrace_range", &raytrace_range_);
+    readXmlParam(params, "occupancy_max_z", &occupancy_max_z_);
     readXmlParam(params, "shadow_threshold", &shadow_threshold_);
     readXmlParam(params, "padding_scale", &padding_scale_);
     readXmlParam(params, "padding_offset", &padding_offset_);
@@ -103,6 +111,7 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
       readXmlParam(params, "max_update_rate", &max_update_rate_);
     readXmlParam(params, "skip_vertical_pixels", &skip_vertical_pixels_);
     readXmlParam(params, "skip_horizontal_pixels", &skip_horizontal_pixels_);
+    readXmlParam(params, "compression_ratio", &compression_ratio_);
     if (params.hasMember("filtered_cloud_topic"))
       filtered_cloud_topic_ = static_cast<const std::string&>(params["filtered_cloud_topic"]);
     if (params.hasMember("ns"))
@@ -153,6 +162,9 @@ void DepthImageOctomapUpdater::start()
 
   sub_depth_image_ = input_depth_transport_.subscribeCamera(image_topic_, queue_size_,
                                                             &DepthImageOctomapUpdater::depthImageCallback, this, hints);
+
+  service_pause_ = node_handle_.advertiseService("pause_octomap", &DepthImageOctomapUpdater::pauseOctomap, this);
+  service_resume_ = node_handle_.advertiseService("resume_octomap", &DepthImageOctomapUpdater::resumeOctomap, this);
 }
 
 void DepthImageOctomapUpdater::stop()
@@ -163,6 +175,20 @@ void DepthImageOctomapUpdater::stop()
 void DepthImageOctomapUpdater::stopHelper()
 {
   sub_depth_image_.shutdown();
+}
+
+bool DepthImageOctomapUpdater::pauseOctomap(std_srvs::Empty::Request& /*unused*/, std_srvs::Empty::Response& /*unused*/)
+{
+  is_paused_ = true;
+  ROS_INFO("Octomap paused.");
+  return true;
+}
+
+bool DepthImageOctomapUpdater::resumeOctomap(std_srvs::Empty::Request& /*unused*/, std_srvs::Empty::Response& /*unused*/)
+{
+  is_paused_ = false;
+  ROS_INFO("Octomap resumed.");
+  return true;
 }
 
 mesh_filter::MeshHandle DepthImageOctomapUpdater::excludeShape(const shapes::ShapeConstPtr& shape)
@@ -220,6 +246,10 @@ static const bool HOST_IS_BIG_ENDIAN = host_is_big_endian();
 void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstPtr& depth_msg,
                                                   const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
+  if (is_paused_)
+  {
+    return;
+  }
   ROS_DEBUG_NAMED(LOGNAME, "Received a new depth image message (frame = '%s', encoding='%s')",
                   depth_msg->header.frame_id.c_str(), depth_msg->encoding.c_str());
   ros::WallTime start = ros::WallTime::now();
@@ -246,9 +276,11 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     }
   }
   else
+  {
     // every 1000 updates we reset the counter almost to the beginning (use 2 so we don't have so much of a ripple in
     // the measured average)
     image_callback_count_ = 2;
+  }
   last_depth_callback_start_ = start;
   ++image_callback_count_;
 
@@ -364,7 +396,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     inv_fy_ = 1.0 / K4_;
 
     // if there are any NaNs, discard data
-    if (!(px == px && py == py && inv_fx_ == inv_fx_ && inv_fy_ == inv_fy_))
+    if (px != px || py != py || inv_fx_ != inv_fx_ || inv_fy_ != inv_fy_)
       return;
 
     // Pre-compute some constants
@@ -475,22 +507,24 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     {
       const uint16_t* input_row = reinterpret_cast<const uint16_t*>(&depth_msg->data[0]);
 
-      for (int y = skip_vertical_pixels_; y < h_bound; ++y, labels_row += w, input_row += w)
-        for (int x = skip_horizontal_pixels_; x < w_bound; ++x)
+      for (int y = skip_vertical_pixels_; y < h_bound;
+           y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
+        for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
           // not filtered
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND)
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || std::isnan(input_row[x]))
           {
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
+            if (std::isnan(zz) || zz < 0.001)
+            {
+              zz = raytrace_range_ + 0.1;
+            }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if (xx == 0 && yy == 0 && zz == 0)
-              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            // Check if the point is within the specified range
-            if (point_tf.getX() >= -2.0 && point_tf.getX() <= 2.0 && point_tf.getY() >= -2.0 &&
-                point_tf.getY() <= 2.0 && point_tf.getZ() >= 0.1 && point_tf.getZ() <= 2.1)
+            /* Check if the point is within the specified range */
+            if (zz <= raytrace_range_ && 0.05 <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
@@ -500,9 +534,9 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
               const octomap::point3d target_point(point_tf.getX(), point_tf.getY(), point_tf.getZ());
               if (tree_->computeRayKeys(sensor_origin, target_point, ray))
               {
-                for (octomap::KeyRay::iterator it = ray.begin(), end = ray.end(); it != end; ++it)
+                for (auto& it : ray)
                 {
-                  free_cells.insert(*it);
+                  free_cells.insert(it);
                 }
               }
             }
@@ -526,20 +560,23 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     {
       const float* input_row = reinterpret_cast<const float*>(&depth_msg->data[0]);
 
-      for (int y = skip_vertical_pixels_; y < h_bound; ++y, labels_row += w, input_row += w)
-        for (int x = skip_horizontal_pixels_; x < w_bound; ++x)
+      for (int y = skip_vertical_pixels_; y < h_bound;
+           y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
+      {
+        for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND)
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || std::isnan(input_row[x]))
           {
             float zz = input_row[x];
+            if (std::isnan(zz) || zz < 0.001)
+            {
+              zz = raytrace_range_ + 0.1;
+            }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if (xx == 0 && yy == 0 && zz == 0)
-              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            if (point_tf.getX() >= -2.0 && point_tf.getX() <= 2.0 && point_tf.getY() >= -2.0 &&
-                point_tf.getY() <= 2.0 && point_tf.getZ() >= 0.1 && point_tf.getZ() <= 2.1)
+            if (zz <= raytrace_range_ && 0.05 <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
@@ -549,9 +586,9 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
               const octomap::point3d target_point(point_tf.getX(), point_tf.getY(), point_tf.getZ());
               if (tree_->computeRayKeys(sensor_origin, target_point, ray))
               {
-                for (octomap::KeyRay::iterator it = ray.begin(), end = ray.end(); it != end; ++it)
+                for (auto& it : ray)
                 {
-                  free_cells.insert(*it);
+                  free_cells.insert(it);
                 }
               }
             }
@@ -569,6 +606,27 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             model_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
           }
         }
+      }
+    }
+
+    for (double xx = -raytrace_range_ - 0.5; xx <= raytrace_range_ + 0.5; xx += 0.05)
+    {
+      double x = xx + sensor_origin.x();
+      for (double yy = -raytrace_range_ - 0.5; yy <= raytrace_range_ + 0.5; yy += 0.05)
+      {
+        double y = yy + sensor_origin.y();
+        for (double zz = -raytrace_range_ - 0.5; zz <= raytrace_range_ + 0.5; zz += 0.05)
+        {
+          double z = zz + sensor_origin.z();
+          if (z < 0 || z > occupancy_max_z_ + 0.05)
+            continue;
+          double square_r = pow(xx, 2.0) + pow(yy, 2.0) + pow(zz, 2.0);
+          if (pow(raytrace_range_, 2.0) < square_r && square_r <= pow(raytrace_range_ + 0.5, 2.0))
+          {
+            free_cells.insert(tree_->coordToKey(x, y, z));
+          }
+        }
+      }
     }
   }
   catch (...)

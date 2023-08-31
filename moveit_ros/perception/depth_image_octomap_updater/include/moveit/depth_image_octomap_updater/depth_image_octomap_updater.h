@@ -37,6 +37,7 @@
 #pragma once
 
 #include <ros/ros.h>
+#include <ros/service_server.h>
 #include <tf2_ros/buffer.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_updater.h>
 #include <moveit/mesh_filter/mesh_filter.h>
@@ -44,6 +45,7 @@
 #include <moveit/lazy_free_space_updater/lazy_free_space_updater.h>
 #include <image_transport/image_transport.h>
 #include <memory>
+#include <std_srvs/Empty.h>
 
 namespace occupancy_map_monitor
 {
@@ -64,6 +66,13 @@ private:
   void depthImageCallback(const sensor_msgs::ImageConstPtr& depth_msg, const sensor_msgs::CameraInfoConstPtr& info_msg);
   bool getShapeTransform(mesh_filter::MeshHandle h, Eigen::Isometry3d& transform) const;
   void stopHelper();
+
+  ros::NodeHandle node_handle_;
+  bool pauseOctomap(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
+  bool resumeOctomap(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
+  ros::ServiceServer service_pause_;
+  ros::ServiceServer service_resume_;
+  bool is_paused_;
 
   ros::NodeHandle nh_;
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -86,12 +95,15 @@ private:
   std::size_t queue_size_;
   double near_clipping_plane_distance_;
   double far_clipping_plane_distance_;
+  double raytrace_range_;
+  double occupancy_max_z_;
   double shadow_threshold_;
   double padding_scale_;
   double padding_offset_;
   double max_update_rate_;
   unsigned int skip_vertical_pixels_;
   unsigned int skip_horizontal_pixels_;
+  unsigned int compression_ratio_;
 
   unsigned int image_callback_count_;
   double average_callback_dt_;
