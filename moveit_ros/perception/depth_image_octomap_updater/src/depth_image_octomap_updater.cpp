@@ -130,6 +130,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
 
 bool DepthImageOctomapUpdater::initialize()
 {
+  is_paused_ = false;
+
   tf_buffer_ = monitor_->getTFClient();
   free_space_updater_ = std::make_unique<LazyFreeSpaceUpdater>(tree_);
 
