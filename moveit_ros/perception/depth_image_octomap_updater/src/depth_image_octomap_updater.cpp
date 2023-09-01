@@ -61,19 +61,19 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , filtered_depth_transport_(nh_)
   , filtered_label_transport_(nh_)
   , image_topic_("depth")
-  , queue_size_(5)
-  , near_clipping_plane_distance_(0.3)
+  , queue_size_(1)
+  , near_clipping_plane_distance_(0.1)
   , far_clipping_plane_distance_(3.0)
   , raytrace_range_(2.0)
-  , occupancy_min_z_(0.2)
-  , occupancy_max_z_(2.0)
+  , occupancy_min_z_(0.15)
+  , occupancy_max_z_(2.5)
   , shadow_threshold_(0.04)
-  , padding_scale_(0.0)
+  , padding_scale_(1.01)
   , padding_offset_(0.02)
   , max_update_rate_(10)
   , skip_vertical_pixels_(4)
   , skip_horizontal_pixels_(6)
-  , compression_ratio_(1)
+  , compression_ratio_(4)
   , image_callback_count_(0)
   , average_callback_dt_(0.0)
   , good_tf_(5)
@@ -514,10 +514,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
           // not filtered
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || std::isnan(input_row[x]))
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || !std::isfinite(input_row[x]))
           {
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
-            if (std::isnan(zz) || zz < 0.001)
+            if (!std::isfinite(zz) || zz < 0.01)
             {
               zz = raytrace_range_ + 0.1;
             }
@@ -567,10 +567,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       {
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || std::isnan(input_row[x]))
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || !std::isfinite(input_row[x]))
           {
             float zz = input_row[x];
-            if (std::isnan(zz) || zz < 0.001)
+            if (!std::isfinite(zz) || zz < 0.01)
             {
               zz = raytrace_range_ + 0.1;
             }
@@ -620,12 +620,9 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
         double y = yy + sensor_origin.y();
         for (double zz = -raytrace_range_ - 0.6; zz <= raytrace_range_ + 0.6; zz += voxel_size)
         {
-          // zz = std::min(zz, occupancy_min_z_ - 0.05 - sensor_origin.z());
           double z = zz + sensor_origin.z();
           if (z < occupancy_min_z_ - 0.05 || z > occupancy_max_z_ + 0.05)
             continue;
-          // if (z > occupancy_max_z_ + 0.05)
-          // break;
           double sq_r = pow(xx, 2.0) + pow(yy, 2.0) + pow(zz, 2.0);
           if (pow(raytrace_range_, 2.0) < sq_r && sq_r <= pow(raytrace_range_ + 0.6, 2.0))
           {
