@@ -63,9 +63,10 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , image_topic_("depth")
   , queue_size_(5)
   , near_clipping_plane_distance_(0.3)
-  , far_clipping_plane_distance_(5.0)
-  , raytrace_range_(3.0)
-  , occupancy_max_z_(3.0)
+  , far_clipping_plane_distance_(3.0)
+  , raytrace_range_(2.0)
+  , occupancy_min_z_(0.2)
+  , occupancy_max_z_(2.0)
   , shadow_threshold_(0.04)
   , padding_scale_(0.0)
   , padding_offset_(0.02)
@@ -103,6 +104,7 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
     readXmlParam(params, "raytrace_range", &raytrace_range_);
+    readXmlParam(params, "occupancy_mim_z", &occupancy_min_z_);
     readXmlParam(params, "occupancy_max_z", &occupancy_max_z_);
     readXmlParam(params, "shadow_threshold", &shadow_threshold_);
     readXmlParam(params, "padding_scale", &padding_scale_);
@@ -524,7 +526,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             /* Check if the point is within the specified range */
-            if (zz <= raytrace_range_ && 0.05 <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
+            if (zz <= raytrace_range_ && occupancy_min_z_ <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
@@ -576,7 +578,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float xx = x_cache_[x] * zz;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            if (zz <= raytrace_range_ && 0.05 <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
+            if (zz <= raytrace_range_ && occupancy_min_z_ <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
@@ -609,19 +611,23 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       }
     }
 
-    for (double xx = -raytrace_range_ - 0.5; xx <= raytrace_range_ + 0.5; xx += 0.05)
+    double voxel_size = monitor_->getMapResolution();
+    for (double xx = -raytrace_range_ - 0.6; xx <= raytrace_range_ + 0.6; xx += voxel_size)
     {
       double x = xx + sensor_origin.x();
-      for (double yy = -raytrace_range_ - 0.5; yy <= raytrace_range_ + 0.5; yy += 0.05)
+      for (double yy = -raytrace_range_ - 0.6; yy <= raytrace_range_ + 0.6; yy += voxel_size)
       {
         double y = yy + sensor_origin.y();
-        for (double zz = -raytrace_range_ - 0.5; zz <= raytrace_range_ + 0.5; zz += 0.05)
+        for (double zz = -raytrace_range_ - 0.6; zz <= raytrace_range_ + 0.6; zz += voxel_size)
         {
+          // zz = std::min(zz, occupancy_min_z_ - 0.05 - sensor_origin.z());
           double z = zz + sensor_origin.z();
-          if (z < 0 || z > occupancy_max_z_ + 0.05)
+          if (z < occupancy_min_z_ - 0.05 || z > occupancy_max_z_ + 0.05)
             continue;
-          double square_r = pow(xx, 2.0) + pow(yy, 2.0) + pow(zz, 2.0);
-          if (pow(raytrace_range_, 2.0) < square_r && square_r <= pow(raytrace_range_ + 0.5, 2.0))
+          // if (z > occupancy_max_z_ + 0.05)
+          // break;
+          double sq_r = pow(xx, 2.0) + pow(yy, 2.0) + pow(zz, 2.0);
+          if (pow(raytrace_range_, 2.0) < sq_r && sq_r <= pow(raytrace_range_ + 0.6, 2.0))
           {
             free_cells.insert(tree_->coordToKey(x, y, z));
           }

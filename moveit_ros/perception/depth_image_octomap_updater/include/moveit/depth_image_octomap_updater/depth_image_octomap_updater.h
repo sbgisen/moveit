@@ -96,6 +96,7 @@ private:
   double near_clipping_plane_distance_;
   double far_clipping_plane_distance_;
   double raytrace_range_;
+  double occupancy_min_z_;
   double occupancy_max_z_;
   double shadow_threshold_;
   double padding_scale_;
