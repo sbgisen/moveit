@@ -521,10 +521,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
         {
           // not filtered
           if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
-              (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP && !std::isfinite(input_row[x])))
+              labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
           {
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
-            if (!std::isfinite(zz) || zz < 0.01)
+            if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
             {
               zz = raytrace_range_ + 0.1;
             }
@@ -580,10 +580,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
           if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
-              (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP && !std::isfinite(input_row[x])))
+              labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
           {
             float zz = input_row[x];
-            if (!std::isfinite(zz) || zz < 0.01)
+            if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
             {
               zz = raytrace_range_ + 0.1;
             }
