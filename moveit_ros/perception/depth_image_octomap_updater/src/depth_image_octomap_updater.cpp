@@ -50,6 +50,7 @@
 #include <cmath>
 #include <iterator>
 #include <memory>
+#include "moveit/mesh_filter/mesh_filter_base.h"
 
 namespace occupancy_map_monitor
 {
@@ -515,10 +516,12 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
       for (int y = skip_vertical_pixels_; y < h_bound;
            y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
+      {
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
           // not filtered
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || !std::isfinite(input_row[x]))
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
+              (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP && !std::isfinite(input_row[x])))
           {
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
             if (!std::isfinite(zz) || zz < 0.01)
@@ -560,7 +563,12 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             // add to the list of model cells
             model_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
           }
+          else
+          {
+            ROS_ERROR_STREAM("depth image error; label: " << labels_row[x] << "depth: " << input_row[x]);
+          }
         }
+      }
     }
     else
     {
@@ -571,7 +579,8 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       {
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND || !std::isfinite(input_row[x]))
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
+              (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP && !std::isfinite(input_row[x])))
           {
             float zz = input_row[x];
             if (!std::isfinite(zz) || zz < 0.01)
@@ -610,6 +619,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             // add to the list of model cells
             model_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+          }
+          else
+          {
+            ROS_ERROR_STREAM("depth image error; label: " << labels_row[x] << "depth: " << input_row[x]);
           }
         }
       }
