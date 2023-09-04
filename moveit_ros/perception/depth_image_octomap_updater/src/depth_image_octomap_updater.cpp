@@ -36,6 +36,8 @@
 
 #include <moveit/depth_image_octomap_updater/depth_image_octomap_updater.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_monitor.h>
+#include <octomap/OcTree.h>
+#include <octomap/math/Vector3.h>
 #include <std_srvs/Empty.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/LinearMath/Vector3.h>
@@ -612,27 +614,6 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
         }
       }
     }
-
-    double voxel_size = monitor_->getMapResolution();
-    for (double xx = -raytrace_range_ - 0.6; xx <= raytrace_range_ + 0.6; xx += voxel_size)
-    {
-      double x = xx + sensor_origin.x();
-      for (double yy = -raytrace_range_ - 0.6; yy <= raytrace_range_ + 0.6; yy += voxel_size)
-      {
-        double y = yy + sensor_origin.y();
-        for (double zz = -raytrace_range_ - 0.6; zz <= raytrace_range_ + 0.6; zz += voxel_size)
-        {
-          double z = zz + sensor_origin.z();
-          if (z < occupancy_min_z_ - 0.05 || z > occupancy_max_z_ + 0.05)
-            continue;
-          double sq_r = pow(xx, 2.0) + pow(yy, 2.0) + pow(zz, 2.0);
-          if (pow(raytrace_range_, 2.0) < sq_r && sq_r <= pow(raytrace_range_ + 0.6, 2.0))
-          {
-            free_cells.insert(tree_->coordToKey(x, y, z));
-          }
-        }
-      }
-    }
   }
   catch (...)
   {
@@ -655,6 +636,15 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     /* now mark all occupied cells */
     for (const octomap::OcTreeKey& occupied_cell : occupied_cells)
       tree_->updateNode(occupied_cell, true);
+
+    for (octomap::OcTree::leaf_iterator it = tree_->begin_leafs(), end = tree_->end_leafs(); it != end; ++it)
+    {
+      octomap::point3d point = it.getCoordinate();
+      if (sensor_origin.distance(point) > raytrace_range_)
+      {
+        tree_->deleteNode(point, false);
+      }
+    }
   }
   catch (...)
   {
