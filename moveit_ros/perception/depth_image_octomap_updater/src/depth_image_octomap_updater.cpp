@@ -186,15 +186,29 @@ void DepthImageOctomapUpdater::stopHelper()
 
 bool DepthImageOctomapUpdater::pauseOctomap(std_srvs::Empty::Request& /*unused*/, std_srvs::Empty::Response& /*unused*/)
 {
-  is_paused_ = true;
-  ROS_INFO("Octomap paused.");
+  if (!is_paused_)
+  {
+    is_paused_ = true;
+    ROS_INFO("Octomap paused.");
+  }
+  else
+  {
+    ROS_INFO("Octomap is already paused.");
+  }
   return true;
 }
 
 bool DepthImageOctomapUpdater::resumeOctomap(std_srvs::Empty::Request& /*unused*/, std_srvs::Empty::Response& /*unused*/)
 {
-  is_paused_ = false;
-  ROS_INFO("Octomap resumed.");
+  if (is_paused_)
+  {
+    is_paused_ = false;
+    ROS_INFO("Octomap resumed.");
+  }
+  else
+  {
+    ROS_INFO("Octomap is already resumed.");
+  }
   return true;
 }
 
@@ -563,10 +577,6 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             // add to the list of model cells
             model_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
           }
-          else
-          {
-            ROS_ERROR_STREAM("depth image error; label: " << labels_row[x] << "depth: " << input_row[x]);
-          }
         }
       }
     }
@@ -620,10 +630,6 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             // add to the list of model cells
             model_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
           }
-          else
-          {
-            ROS_ERROR_STREAM("depth image error; label: " << labels_row[x] << "depth: " << input_row[x]);
-          }
         }
       }
     }
@@ -653,7 +659,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     for (octomap::OcTree::leaf_iterator it = tree_->begin_leafs(), end = tree_->end_leafs(); it != end; ++it)
     {
       octomap::point3d point = it.getCoordinate();
-      if (sensor_origin.distance(point) > raytrace_range_)
+      if (sensor_origin.distance(point) > raytrace_range_ + 0.5)
       {
         tree_->deleteNode(point, false);
       }
