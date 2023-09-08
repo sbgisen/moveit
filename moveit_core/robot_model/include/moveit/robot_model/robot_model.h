@@ -37,11 +37,16 @@
 
 #pragma once
 
+#include <geometric_shapes/shapes.h>
+#include <geometric_shapes/bodies.h>
+#include <geometric_shapes/body_operations.h>
 #include <moveit/macros/class_forward.h>
 #include <moveit/exceptions/exceptions.h>
+#include <moveit/robot_model/link_model.h>
 #include <moveit/utils/lexical_casts.h>
 
 #include <urdf/model.h>
+#include <urdf_model/types.h>
 #include <srdfdom/model.h>
 
 // joint types
@@ -54,6 +59,8 @@
 
 #include <Eigen/Geometry>
 #include <iostream>
+#include <memory>
+#include "moveit/robot_model/link_model.h"
 
 /** \brief Main namespace for MoveIt */
 namespace moveit
@@ -103,6 +110,9 @@ public:
   {
     return root_link_ == nullptr;
   }
+
+  /** \brief  construct padded and scaled URDF model*/
+  urdf::ModelInterfaceSharedPtr getPaddedScaleURDF() const;
 
   /** \brief Get the parsed URDF model */
   const urdf::ModelInterfaceSharedPtr& getURDF() const
@@ -654,6 +664,15 @@ protected:
 
   /** \brief Given a geometry spec from the URDF and a filename (for a mesh), construct the corresponding shape object*/
   shapes::ShapePtr constructShape(const urdf::Geometry* geom);
+
+  /** \brief Given a shape object, construct a geometry spec for the URDF*/
+  urdf::GeometrySharedPtr constructGeometry(const shapes::ShapePtr& shape) const;
+
+  /** \brief write shape::mesh to STL*/
+  bool writeMeshToSTL(const shapes::Mesh* mesh, const std::string& filename) const;
+
+  /** \brief remove STL file, use after loading padded/scaled URDF model*/
+  bool deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const;
 };
 }  // namespace core
 }  // namespace moveit

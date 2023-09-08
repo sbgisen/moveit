@@ -556,7 +556,7 @@ void PlanningSceneDisplay::onRobotModelLoaded()
   const planning_scene_monitor::LockedPlanningSceneRO& ps = getPlanningSceneRO();
   if (planning_scene_robot_)
   {
-    planning_scene_robot_->load(*getRobotModel()->getURDF());
+    planning_scene_robot_->load(*getRobotModel()->getPaddedScaleURDF());
     moveit::core::RobotState* rs = new moveit::core::RobotState(ps->getCurrentState());
     rs->update();
     planning_scene_robot_->update(moveit::core::RobotStateConstPtr(rs));
