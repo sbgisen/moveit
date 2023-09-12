@@ -112,7 +112,7 @@ public:
   }
 
   /** \brief  construct padded and scaled URDF model*/
-  urdf::ModelInterfaceSharedPtr getPaddedScaleURDF() const;
+  urdf::ModelInterfaceSharedPtr getPaddedScaleURDF(const std::map<std::string, double> scale, const std::map<std:: string, double> padd) const;
 
   /** \brief Get the parsed URDF model */
   const urdf::ModelInterfaceSharedPtr& getURDF() const
@@ -483,6 +483,9 @@ public:
   /// A map of known kinematics solvers (associated to their group name)
   void setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn>& allocators);
 
+  /** \brief remove STL file, use after loading padded/scaled URDF model*/
+  void deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const;
+
 protected:
   /** \brief Get the transforms between link and all its rigidly attached descendants */
   void computeFixedTransforms(const LinkModel* link, const Eigen::Isometry3d& transform,
@@ -671,8 +674,6 @@ protected:
   /** \brief write shape::mesh to STL*/
   bool writeMeshToSTL(const shapes::Mesh* mesh, const std::string& filename) const;
 
-  /** \brief remove STL file, use after loading padded/scaled URDF model*/
-  bool deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const;
 };
 }  // namespace core
 }  // namespace moveit

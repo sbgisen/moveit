@@ -111,6 +111,7 @@ public:
   /// get write access to planning scene
   planning_scene_monitor::LockedPlanningSceneRW getPlanningSceneRW();
   const planning_scene_monitor::PlanningSceneMonitorPtr& getPlanningSceneMonitor();
+  urdf::ModelInterfaceSharedPtr urdf_;
 
 private Q_SLOTS:
 

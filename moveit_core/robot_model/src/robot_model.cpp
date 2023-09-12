@@ -1206,85 +1206,6 @@ shapes::ShapePtr RobotModel::constructShape(const urdf::Geometry* geom)
   return shapes::ShapePtr(new_shape);
 }
 
-urdf::GeometrySharedPtr RobotModel::constructGeometry(const shapes::ShapePtr& shape) const
-{
-  if (!shape)
-  {
-    return nullptr;
-  }
-  switch (shape->type)
-  {
-    case shapes::SPHERE:
-    {
-      const shapes::Sphere* sphere = static_cast<const shapes::Sphere*>(shape.get());
-      urdf::SphereSharedPtr urdf_sphere = std::make_shared<urdf::Sphere>();
-      urdf_sphere->radius = sphere->radius;
-      return urdf_sphere;
-    }
-    case shapes::BOX:
-    {
-      const shapes::Box* box = static_cast<const shapes::Box*>(shape.get());
-      urdf::BoxSharedPtr urdf_box = std::make_shared<urdf::Box>();
-      urdf_box->dim.x = box->size[0];
-      urdf_box->dim.y = box->size[1];
-      urdf_box->dim.z = box->size[2];
-      return urdf_box;
-    }
-    case shapes::CYLINDER:
-    {
-      const shapes::Cylinder* cylinder = static_cast<const shapes::Cylinder*>(shape.get());
-      urdf::CylinderSharedPtr urdf_cylinder = std::make_shared<urdf::Cylinder>();
-      urdf_cylinder->radius = cylinder->radius;
-      urdf_cylinder->length = cylinder->length;
-      return urdf_cylinder;
-    }
-    case shapes::MESH:
-    {
-      const shapes::Mesh* mesh = static_cast<const shapes::Mesh*>(shape.get());
-      urdf::MeshSharedPtr urdf_mesh = std::make_shared<urdf::Mesh>();
-      return urdf_mesh;
-    }
-    default:
-      ROS_ERROR_NAMED(LOGNAME, "Unknown geometry type: %d", (int)shape->type);
-      return nullptr;
-  }
-}
-
-bool RobotModel::writeMeshToSTL(const shapes::Mesh* mesh, const std::string& filename) const
-{
-  std::unique_ptr<aiScene> scene = std::make_unique<aiScene>();
-  scene->mRootNode = new aiNode();
-  auto ai_mesh = new aiMesh();
-  scene->mMeshes = new aiMesh* [1] { ai_mesh };
-  scene->mNumMeshes = 1;
-  scene->mRootNode->mMeshes = new unsigned int[1]{ 0 };
-  scene->mRootNode->mNumMeshes = 1;
-  ai_mesh->mVertices = new aiVector3D[mesh->vertex_count];
-  ai_mesh->mNumVertices = mesh->vertex_count;
-  for (std::size_t i = 0; i < mesh->vertex_count; ++i)
-  {
-    ai_mesh->mVertices[i] = aiVector3D(mesh->vertices[3 * i], mesh->vertices[3 * i + 1], mesh->vertices[3 * i + 2]);
-  }
-  ai_mesh->mFaces = new aiFace[mesh->triangle_count];
-  ai_mesh->mNumFaces = mesh->triangle_count;
-  for (std::size_t i = 0; i < mesh->triangle_count; ++i)
-  {
-    aiFace& face = ai_mesh->mFaces[i];
-    face.mIndices = new unsigned int[3];
-    face.mNumIndices = 3;
-    face.mIndices[0] = mesh->triangles[3 * i];
-    face.mIndices[1] = mesh->triangles[3 * i + 1];
-    face.mIndices[2] = mesh->triangles[3 * i + 2];
-  }
-  Assimp::Exporter exporter;
-  if (exporter.Export(scene.get(), "stl", filename) != AI_SUCCESS)
-  {
-    ROS_ERROR_STREAM("Failed to export mesh to STL. Assimp error: " << exporter.GetErrorString());
-    return false;
-  }
-  return true;
-}
-
 bool RobotModel::hasJointModel(const std::string& name) const
 {
   return joint_model_map_.find(name) != joint_model_map_.end();
@@ -1638,7 +1559,123 @@ void RobotModel::computeFixedTransforms(const LinkModel* link, const Eigen::Isom
                              transform * link->getJointOriginTransform(), associated_transforms);
 }
 
-urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF() const
+urdf::GeometrySharedPtr RobotModel::constructGeometry(const shapes::ShapePtr& shape) const
+{
+  if (!shape)
+  {
+    return nullptr;
+  }
+  switch (shape->type)
+  {
+    case shapes::SPHERE:
+    {
+      const shapes::Sphere* sphere = static_cast<const shapes::Sphere*>(shape.get());
+      urdf::SphereSharedPtr urdf_sphere = std::make_shared<urdf::Sphere>();
+      urdf_sphere->radius = sphere->radius;
+      return urdf_sphere;
+    }
+    case shapes::BOX:
+    {
+      const shapes::Box* box = static_cast<const shapes::Box*>(shape.get());
+      urdf::BoxSharedPtr urdf_box = std::make_shared<urdf::Box>();
+      urdf_box->dim.x = box->size[0];
+      urdf_box->dim.y = box->size[1];
+      urdf_box->dim.z = box->size[2];
+      return urdf_box;
+    }
+    case shapes::CYLINDER:
+    {
+      const shapes::Cylinder* cylinder = static_cast<const shapes::Cylinder*>(shape.get());
+      urdf::CylinderSharedPtr urdf_cylinder = std::make_shared<urdf::Cylinder>();
+      urdf_cylinder->radius = cylinder->radius;
+      urdf_cylinder->length = cylinder->length;
+      return urdf_cylinder;
+    }
+    case shapes::MESH:
+    {
+      const shapes::Mesh* mesh = static_cast<const shapes::Mesh*>(shape.get());
+      urdf::MeshSharedPtr urdf_mesh = std::make_shared<urdf::Mesh>();
+      return urdf_mesh;
+    }
+    default:
+      ROS_ERROR_NAMED(LOGNAME, "Unknown geometry type: %d", (int)shape->type);
+      return nullptr;
+  }
+}
+
+bool RobotModel::writeMeshToSTL(const shapes::Mesh* mesh, const std::string& filename) const
+{
+  std::unique_ptr<aiScene> scene = std::make_unique<aiScene>();
+  scene->mRootNode = new aiNode();
+  auto ai_mesh = new aiMesh();
+  scene->mMeshes = new aiMesh* [1] { ai_mesh };
+  scene->mNumMeshes = 1;
+  scene->mRootNode->mMeshes = new unsigned int[1]{ 0 };
+  scene->mRootNode->mNumMeshes = 1;
+  ai_mesh->mVertices = new aiVector3D[mesh->vertex_count];
+  ai_mesh->mNumVertices = mesh->vertex_count;
+  for (std::size_t i = 0; i < mesh->vertex_count; ++i)
+  {
+    ai_mesh->mVertices[i] = aiVector3D(mesh->vertices[3 * i], mesh->vertices[3 * i + 1], mesh->vertices[3 * i + 2]);
+  }
+  ai_mesh->mFaces = new aiFace[mesh->triangle_count];
+  ai_mesh->mNumFaces = mesh->triangle_count;
+  for (std::size_t i = 0; i < mesh->triangle_count; ++i)
+  {
+    aiFace& face = ai_mesh->mFaces[i];
+    face.mIndices = new unsigned int[3];
+    face.mNumIndices = 3;
+    face.mIndices[0] = mesh->triangles[3 * i];
+    face.mIndices[1] = mesh->triangles[3 * i + 1];
+    face.mIndices[2] = mesh->triangles[3 * i + 2];
+  }
+  Assimp::Exporter exporter;
+  if (exporter.Export(scene.get(), "stl", filename) != AI_SUCCESS)
+  {
+    ROS_ERROR_STREAM("Failed to export mesh to STL. Assimp error: " << exporter.GetErrorString());
+    return false;
+  }
+  return true;
+}
+
+void RobotModel::deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const
+{
+  for(auto link = urdf_model->links_.begin(); link != urdf_model->links_.end(); ++link)
+  {
+    if(!link->second->collision_array.empty())
+    {
+      for(auto collision: link->second->collision_array)
+      {
+        if(collision->geometry->type == urdf::Geometry::MESH)
+        {
+          auto mesh = static_cast<const urdf::Mesh*>(collision->geometry.get());
+          std::string filename = mesh->filename;
+          if(filename.substr(0, 7) == "file://")
+          {
+            filename = filename.substr(7);
+            std::remove(filename.c_str());
+          }
+        }
+      }
+    }
+    else if (link->second->collision)
+    {
+      if(link->second->collision->geometry->type == urdf::Geometry::MESH)
+      {
+        auto mesh = static_cast<const urdf::Mesh*>(link->second->collision->geometry.get());
+        std::string filename = mesh->filename;
+        if(filename.substr(0, 7) == "file://")
+        {
+          filename = filename.substr(7);
+          std::remove(filename.c_str());
+        }
+      }
+    }
+  }
+  ROS_WARN_STREAM("Removed all STL files");
+}
+
+urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF(const std::map<std::string, double> scale, const std::map<std:: string, double> padd) const
 {
   urdf::ModelInterface& urdf = *urdf_;
   urdf::ModelInterfaceSharedPtr padded_scaled_urdf = std::make_shared<urdf::ModelInterface>(urdf);
@@ -1650,8 +1687,7 @@ urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF() const
     for (const auto& shape : link->getShapes())
     {
       shapes::ShapePtr scaled_padded_shape(shape->clone());
-      // scaled_padded_shape->scaleAndPadd(0.5, 0.0);
-      scaled_padded_shape->scaleAndPadd(1.0, 0.01);
+      scaled_padded_shape->scaleAndPadd(scale.at(link->getName()), padd.at(link->getName()));
       if (scaled_padded_shape)
       {
         if (scaled_padded_shape->type == shapes::MESH)
@@ -1662,12 +1698,7 @@ urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF() const
           {
             ros_home_dir = getenv("HOME") + std::string("/.ros");
           }
-          std::string filename = ros_home_dir + "/" + link->getName() + ".stl";
-          // if (!writeMeshToSTL(static_cast<const shapes::Mesh*>(shape.get()), filename))
-          // {
-          //   ROS_ERROR_STREAM("Failed to write mesh to STL file: " << filename);
-          //   continue;
-          // }
+          std::string filename = ros_home_dir + "/" + link->getName() + "_padded_scaled.stl";
           std::vector<char> buffer;
           shapes::writeSTLBinary(static_cast<const shapes::Mesh*>(scaled_padded_shape.get()), buffer);
           std::ofstream out(filename, std::ios::binary | std::ios::trunc);
@@ -1695,10 +1726,9 @@ urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF() const
     }
     if (!padded_scaled_urdf->links_[link->getName()]->collision_array.empty())
     {
-      std::vector<urdf::CollisionSharedPtr> collisions = padded_scaled_urdf->links_[link->getName()]->collision_array;
-      for (std::size_t i = 0; i < collisions.size(); ++i)
+      for (std::size_t i = 0; i < padded_scaled_urdf->links_[link->getName()]->collision_array.size(); ++i)
       {
-        collisions[i]->geometry = geometries[i];
+        padded_scaled_urdf->links_[link->getName()]->collision_array[i]->geometry = geometries[i];
       }
     }
     else if (padded_scaled_urdf->links_[link->getName()]->collision)
@@ -1706,10 +1736,6 @@ urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF() const
       padded_scaled_urdf->links_[link->getName()]->collision->geometry = geometries[0];
     }
   }
-  std::cout << "Padded and scaled URDF model constructed "
-            << padded_scaled_urdf->links_["head_pan_link"]->collision->geometry->type << std::endl;
-  ROS_WARN_STREAM("Padded and scaled URDF model constructed "
-                  << padded_scaled_urdf->links_["head_pan_link"]->collision->geometry->type);
   return padded_scaled_urdf;
 }
 
