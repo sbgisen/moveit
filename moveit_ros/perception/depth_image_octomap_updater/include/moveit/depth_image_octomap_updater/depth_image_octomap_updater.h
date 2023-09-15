@@ -45,7 +45,7 @@
 #include <moveit/lazy_free_space_updater/lazy_free_space_updater.h>
 #include <image_transport/image_transport.h>
 #include <memory>
-#include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h>
 
 namespace occupancy_map_monitor
 {
@@ -68,10 +68,8 @@ private:
   void stopHelper();
 
   ros::NodeHandle node_handle_;
-  bool pauseOctomap(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
-  bool resumeOctomap(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
-  ros::ServiceServer service_pause_;
-  ros::ServiceServer service_resume_;
+  bool enableOctomap(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  ros::ServiceServer enable_service_;
   bool is_paused_;
 
   ros::NodeHandle nh_;

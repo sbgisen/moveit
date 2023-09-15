@@ -170,8 +170,7 @@ void DepthImageOctomapUpdater::start()
   sub_depth_image_ = input_depth_transport_.subscribeCamera(image_topic_, queue_size_,
                                                             &DepthImageOctomapUpdater::depthImageCallback, this, hints);
 
-  service_pause_ = node_handle_.advertiseService("pause_octomap", &DepthImageOctomapUpdater::pauseOctomap, this);
-  service_resume_ = node_handle_.advertiseService("resume_octomap", &DepthImageOctomapUpdater::resumeOctomap, this);
+  enable_service_ = node_handle_.advertiseService("enable_octomap", &DepthImageOctomapUpdater::enableOctomap, this);
 }
 
 void DepthImageOctomapUpdater::stop()
@@ -184,31 +183,41 @@ void DepthImageOctomapUpdater::stopHelper()
   sub_depth_image_.shutdown();
 }
 
-bool DepthImageOctomapUpdater::pauseOctomap(std_srvs::Empty::Request& /*unused*/, std_srvs::Empty::Response& /*unused*/)
+bool DepthImageOctomapUpdater::enableOctomap(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res)
 {
-  if (!is_paused_)
+  if (req.data)
   {
-    is_paused_ = true;
-    ROS_INFO("Octomap paused.");
+    if (is_paused_)
+    {
+      is_paused_ = false;
+      std::string log = "Octomap resumed.";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
+    else
+    {
+      std::string log = "Octomap is already enabled";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
   }
   else
   {
-    ROS_INFO("Octomap is already paused.");
+    if (!is_paused_)
+    {
+      is_paused_ = true;
+      std::string log = "Octomap paused.";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
+    else
+    {
+      std::string log = "Octomap is already paused";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
   }
-  return true;
-}
-
-bool DepthImageOctomapUpdater::resumeOctomap(std_srvs::Empty::Request& /*unused*/, std_srvs::Empty::Response& /*unused*/)
-{
-  if (is_paused_)
-  {
-    is_paused_ = false;
-    ROS_INFO("Octomap resumed.");
-  }
-  else
-  {
-    ROS_INFO("Octomap is already resumed.");
-  }
+  res.success = true;
   return true;
 }
 
