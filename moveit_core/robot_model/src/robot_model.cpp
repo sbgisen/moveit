@@ -40,6 +40,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <moveit/profiler/profiler.h>
 #include <algorithm>
+#include <fstream>
 #include <limits>
 #include <cmath>
 #include <memory>
@@ -1546,6 +1547,152 @@ void RobotModel::computeFixedTransforms(const LinkModel* link, const Eigen::Isom
     if (link->getChildJointModels()[i]->getType() == JointModel::FIXED)
       computeFixedTransforms(link->getChildJointModels()[i]->getChildLinkModel(),
                              transform * link->getJointOriginTransform(), associated_transforms);
+}
+
+urdf::GeometrySharedPtr RobotModel::constructGeometry(const shapes::ShapePtr& shape) const
+{
+  if (!shape)
+  {
+    return nullptr;
+  }
+  switch (shape->type)
+  {
+    case shapes::SPHERE:
+    {
+      const shapes::Sphere* sphere = static_cast<const shapes::Sphere*>(shape.get());
+      urdf::SphereSharedPtr urdf_sphere = std::make_shared<urdf::Sphere>();
+      urdf_sphere->radius = sphere->radius;
+      return urdf_sphere;
+    }
+    case shapes::BOX:
+    {
+      const shapes::Box* box = static_cast<const shapes::Box*>(shape.get());
+      urdf::BoxSharedPtr urdf_box = std::make_shared<urdf::Box>();
+      urdf_box->dim.x = box->size[0];
+      urdf_box->dim.y = box->size[1];
+      urdf_box->dim.z = box->size[2];
+      return urdf_box;
+    }
+    case shapes::CYLINDER:
+    {
+      const shapes::Cylinder* cylinder = static_cast<const shapes::Cylinder*>(shape.get());
+      urdf::CylinderSharedPtr urdf_cylinder = std::make_shared<urdf::Cylinder>();
+      urdf_cylinder->radius = cylinder->radius;
+      urdf_cylinder->length = cylinder->length;
+      return urdf_cylinder;
+    }
+    case shapes::MESH:
+    {
+      const shapes::Mesh* mesh = static_cast<const shapes::Mesh*>(shape.get());
+      urdf::MeshSharedPtr urdf_mesh = std::make_shared<urdf::Mesh>();
+      return urdf_mesh;
+    }
+    default:
+      ROS_ERROR_NAMED(LOGNAME, "Unknown geometry type: %d", (int)shape->type);
+      return nullptr;
+  }
+}
+
+void RobotModel::deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const
+{
+  for (auto link = urdf_model->links_.begin(); link != urdf_model->links_.end(); ++link)
+  {
+    if (!link->second->collision_array.empty())
+    {
+      for (auto collision : link->second->collision_array)
+      {
+        if (collision->geometry->type == urdf::Geometry::MESH)
+        {
+          auto mesh = static_cast<const urdf::Mesh*>(collision->geometry.get());
+          std::string filename = mesh->filename;
+          if (filename.substr(0, 7) == "file://")
+          {
+            filename = filename.substr(7);
+            std::remove(filename.c_str());
+          }
+        }
+      }
+    }
+    else if (link->second->collision)
+    {
+      if (link->second->collision->geometry->type == urdf::Geometry::MESH)
+      {
+        auto mesh = static_cast<const urdf::Mesh*>(link->second->collision->geometry.get());
+        std::string filename = mesh->filename;
+        if (filename.substr(0, 7) == "file://")
+        {
+          filename = filename.substr(7);
+          std::remove(filename.c_str());
+        }
+      }
+    }
+  }
+  ROS_WARN_STREAM("Removed all STL files");
+}
+
+urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF(const std::map<std::string, double> scale,
+                                                             const std::map<std::string, double> padd) const
+{
+  urdf::ModelInterface& urdf = *urdf_;
+  urdf::ModelInterfaceSharedPtr padded_scaled_urdf = std::make_shared<urdf::ModelInterface>(urdf);
+  std::vector<const LinkModel*> models = getLinkModelsWithCollisionGeometry();
+  for (const auto link : models)
+  {
+    std::vector<urdf::GeometrySharedPtr> geometries;
+    geometries.clear();
+    for (const auto& shape : link->getShapes())
+    {
+      shapes::ShapePtr scaled_padded_shape(shape->clone());
+      scaled_padded_shape->scaleAndPadd(scale.at(link->getName()), padd.at(link->getName()));
+      if (scaled_padded_shape)
+      {
+        if (scaled_padded_shape->type == shapes::MESH)
+        {
+          std::string ros_home_dir;
+          ros::get_environment_variable(ros_home_dir, "ROS_HOME");
+          if (ros_home_dir.empty())
+          {
+            ros_home_dir = getenv("HOME") + std::string("/.ros");
+          }
+          std::string filename = ros_home_dir + "/" + link->getName() + "_padded_scaled.stl";
+          std::vector<char> buffer;
+          shapes::writeSTLBinary(static_cast<const shapes::Mesh*>(scaled_padded_shape.get()), buffer);
+          std::ofstream out(filename, std::ios::binary | std::ios::trunc);
+          if (!out)
+          {
+            ROS_ERROR_STREAM("Failed to create/open " << filename << " due to " << strerror(errno));
+            continue;
+          }
+          out.write(&buffer[0], buffer.size());
+          out.close();
+          if (!out)
+          {
+            ROS_ERROR_STREAM("Failed to write mesh to STL file: " << filename);
+            continue;
+          }
+          urdf::MeshSharedPtr urdf_mesh = std::make_shared<urdf::Mesh>();
+          urdf_mesh->filename = "file://" + filename;
+          geometries.push_back(urdf_mesh);
+        }
+        else
+        {
+          geometries.push_back(constructGeometry(scaled_padded_shape));
+        }
+      }
+    }
+    if (!padded_scaled_urdf->links_[link->getName()]->collision_array.empty())
+    {
+      for (std::size_t i = 0; i < padded_scaled_urdf->links_[link->getName()]->collision_array.size(); ++i)
+      {
+        padded_scaled_urdf->links_[link->getName()]->collision_array[i]->geometry = geometries[i];
+      }
+    }
+    else if (padded_scaled_urdf->links_[link->getName()]->collision)
+    {
+      padded_scaled_urdf->links_[link->getName()]->collision->geometry = geometries[0];
+    }
+  }
+  return padded_scaled_urdf;
 }
 
 }  // end of namespace core
