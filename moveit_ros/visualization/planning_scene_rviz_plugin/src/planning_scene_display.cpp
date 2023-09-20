@@ -558,12 +558,21 @@ void PlanningSceneDisplay::onRobotModelLoaded()
   {
     auto scale = ps->getCollisionEnv()->getLinkScale();
     auto padd = ps->getCollisionEnv()->getLinkPadding();
-    auto urdf = getRobotModel()->getPaddedScaleURDF(scale, padd);
+    auto urdf = getRobotModel()->createPaddedScaledURDF(scale, padd);
+    bool use_padd_scale = true;
+    if (!urdf)
+    {
+      use_padd_scale = false;
+      urdf = getRobotModel()->getURDF();
+    }
     planning_scene_robot_->load(*urdf);
     moveit::core::RobotState* rs = new moveit::core::RobotState(ps->getCurrentState());
     rs->update();
     planning_scene_robot_->update(moveit::core::RobotStateConstPtr(rs));
-    getRobotModel()->deleteSTLFromURDF(urdf);
+    if (use_padd_scale)
+    {
+      getRobotModel()->deleteSTLFromURDF(urdf);
+    }
   }
 
   bool old_state = scene_name_property_->blockSignals(true);

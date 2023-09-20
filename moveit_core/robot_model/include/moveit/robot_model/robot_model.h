@@ -79,6 +79,10 @@ class RobotModel
 {
 public:
   /** \brief Construct a kinematic model from a parsed description and a list of planning groups */
+  RobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model, const srdf::ModelConstSharedPtr& srdf_model,
+             std::string content);
+
+  /** \brief Construct a kinematic model from a parsed description and a list of planning groups */
   RobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model, const srdf::ModelConstSharedPtr& srdf_model);
 
   /** \brief Destructor. Clear all memory. */
@@ -106,8 +110,11 @@ public:
   }
 
   /** \brief  construct padded and scaled URDF model*/
-  urdf::ModelInterfaceSharedPtr getPaddedScaleURDF(const std::map<std::string, double> scale,
-                                                   const std::map<std::string, double> padd) const;
+  urdf::ModelInterfaceSharedPtr createPaddedScaledURDF(const std::map<std::string, double> scales,
+                                                       const std::map<std::string, double> paddings) const;
+
+  /** \brief remove STL file, use after loading padded/scaled URDF model*/
+  void deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const;
 
   /** \brief Get the parsed URDF model */
   const urdf::ModelInterfaceSharedPtr& getURDF() const
@@ -478,9 +485,6 @@ public:
   /// A map of known kinematics solvers (associated to their group name)
   void setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn>& allocators);
 
-  /** \brief remove STL file, use after loading padded/scaled URDF model*/
-  void deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const;
-
 protected:
   /** \brief Get the transforms between link and all its rigidly attached descendants */
   void computeFixedTransforms(const LinkModel* link, const Eigen::Isometry3d& transform,
@@ -504,6 +508,9 @@ protected:
   srdf::ModelConstSharedPtr srdf_;
 
   urdf::ModelInterfaceSharedPtr urdf_;
+
+  /** \brief Content of robot description from parameter server */
+  std::string robot_description_content_;
 
   // LINKS
 

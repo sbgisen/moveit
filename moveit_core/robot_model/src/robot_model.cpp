@@ -55,6 +55,16 @@ namespace
 constexpr char LOGNAME[] = "robot_model";
 }  // namespace
 
+RobotModel::RobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model, const srdf::ModelConstSharedPtr& srdf_model,
+                       const std::string content)
+{
+  root_joint_ = nullptr;
+  urdf_ = urdf_model;
+  srdf_ = srdf_model;
+  buildModel(*urdf_model, *srdf_model);
+  robot_description_content_ = content;
+}
+
 RobotModel::RobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model, const srdf::ModelConstSharedPtr& srdf_model)
 {
   root_joint_ = nullptr;
@@ -1583,7 +1593,6 @@ urdf::GeometrySharedPtr RobotModel::constructGeometry(const shapes::ShapePtr& sh
     }
     case shapes::MESH:
     {
-      const shapes::Mesh* mesh = static_cast<const shapes::Mesh*>(shape.get());
       urdf::MeshSharedPtr urdf_mesh = std::make_shared<urdf::Mesh>();
       return urdf_mesh;
     }
@@ -1595,11 +1604,11 @@ urdf::GeometrySharedPtr RobotModel::constructGeometry(const shapes::ShapePtr& sh
 
 void RobotModel::deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const
 {
-  for (auto link = urdf_model->links_.begin(); link != urdf_model->links_.end(); ++link)
+  for (auto& link : urdf_model->links_)
   {
-    if (!link->second->collision_array.empty())
+    if (!link.second->collision_array.empty())
     {
-      for (auto collision : link->second->collision_array)
+      for (const auto& collision : link.second->collision_array)
       {
         if (collision->geometry->type == urdf::Geometry::MESH)
         {
@@ -1613,11 +1622,11 @@ void RobotModel::deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_mod
         }
       }
     }
-    else if (link->second->collision)
+    else if (link.second->collision)
     {
-      if (link->second->collision->geometry->type == urdf::Geometry::MESH)
+      if (link.second->collision->geometry->type == urdf::Geometry::MESH)
       {
-        auto mesh = static_cast<const urdf::Mesh*>(link->second->collision->geometry.get());
+        auto mesh = static_cast<const urdf::Mesh*>(link.second->collision->geometry.get());
         std::string filename = mesh->filename;
         if (filename.substr(0, 7) == "file://")
         {
@@ -1627,23 +1636,37 @@ void RobotModel::deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_mod
       }
     }
   }
-  ROS_WARN_STREAM("Removed all STL files");
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Removed all STL files");
 }
 
-urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF(const std::map<std::string, double> scale,
-                                                             const std::map<std::string, double> padd) const
+urdf::ModelInterfaceSharedPtr RobotModel::createPaddedScaledURDF(const std::map<std::string, double> scales,
+                                                                 const std::map<std::string, double> paddings) const
 {
-  urdf::ModelInterface& urdf = *urdf_;
-  urdf::ModelInterfaceSharedPtr padded_scaled_urdf = std::make_shared<urdf::ModelInterface>(urdf);
+  std::unique_ptr<urdf::Model> urdf(new urdf::Model());
+  if (!urdf->initString(robot_description_content_))
+  {
+    ROS_WARN_STREAM_NAMED(LOGNAME, "Could not set padding and scaling parameters because the URDF could not be parsed");
+    return nullptr;
+  }
+
+  urdf::ModelInterfaceSharedPtr padded_scaled_urdf = std::move(urdf);
+
   std::vector<const LinkModel*> models = getLinkModelsWithCollisionGeometry();
   for (const auto link : models)
   {
+    const std::string& link_name = link->getName();
     std::vector<urdf::GeometrySharedPtr> geometries;
-    geometries.clear();
     for (const auto& shape : link->getShapes())
     {
       shapes::ShapePtr scaled_padded_shape(shape->clone());
-      scaled_padded_shape->scaleAndPadd(scale.at(link->getName()), padd.at(link->getName()));
+      double scale = scales.at(link_name);
+      double padd = paddings.at(link_name);
+      if (std::abs(scale - 1.0) <= std::numeric_limits<double>::epsilon() &&
+          std::abs(padd) <= std::numeric_limits<double>::epsilon())
+      {
+        continue;
+      }
+      scaled_padded_shape->scaleAndPadd(scale, padd);
       if (scaled_padded_shape)
       {
         if (scaled_padded_shape->type == shapes::MESH)
@@ -1660,14 +1683,14 @@ urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF(const std::map<std:
           std::ofstream out(filename, std::ios::binary | std::ios::trunc);
           if (!out)
           {
-            ROS_ERROR_STREAM("Failed to create/open " << filename << " due to " << strerror(errno));
+            ROS_ERROR_STREAM_NAMED(LOGNAME, "Failed to create/open " << filename << " due to " << strerror(errno));
             continue;
           }
           out.write(&buffer[0], buffer.size());
           out.close();
           if (!out)
           {
-            ROS_ERROR_STREAM("Failed to write mesh to STL file: " << filename);
+            ROS_ERROR_STREAM_NAMED(LOGNAME, "Failed to write mesh to STL file: " << filename);
             continue;
           }
           urdf::MeshSharedPtr urdf_mesh = std::make_shared<urdf::Mesh>();
@@ -1680,16 +1703,24 @@ urdf::ModelInterfaceSharedPtr RobotModel::getPaddedScaleURDF(const std::map<std:
         }
       }
     }
-    if (!padded_scaled_urdf->links_[link->getName()]->collision_array.empty())
+    if (!padded_scaled_urdf->links_[link_name]->collision_array.empty())
     {
-      for (std::size_t i = 0; i < padded_scaled_urdf->links_[link->getName()]->collision_array.size(); ++i)
+      if (padded_scaled_urdf->links_[link_name]->collision_array.size() != geometries.size())
       {
-        padded_scaled_urdf->links_[link->getName()]->collision_array[i]->geometry = geometries[i];
+        continue;
+      }
+      for (std::size_t i = 0; i < padded_scaled_urdf->links_[link_name]->collision_array.size(); ++i)
+      {
+        padded_scaled_urdf->links_[link_name]->collision_array[i]->geometry = geometries[i];
       }
     }
-    else if (padded_scaled_urdf->links_[link->getName()]->collision)
+    else if (padded_scaled_urdf->links_[link_name]->collision)
     {
-      padded_scaled_urdf->links_[link->getName()]->collision->geometry = geometries[0];
+      if (geometries.size() != 1)
+      {
+        continue;
+      }
+      padded_scaled_urdf->links_[link_name]->collision->geometry = geometries[0];
     }
   }
   return padded_scaled_urdf;
