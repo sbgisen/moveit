@@ -45,6 +45,7 @@
 #include <cmath>
 #include <memory>
 #include "order_robot_model_items.inc"
+#include <filesystem>
 
 namespace moveit
 {
@@ -1617,7 +1618,7 @@ void RobotModel::deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_mod
           if (filename.substr(0, 7) == "file://")
           {
             filename = filename.substr(7);
-            std::remove(filename.c_str());
+            std::filesystem::remove(filename.c_str());
           }
         }
       }
@@ -1631,7 +1632,7 @@ void RobotModel::deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_mod
         if (filename.substr(0, 7) == "file://")
         {
           filename = filename.substr(7);
-          std::remove(filename.c_str());
+          std::filesystem::remove(filename.c_str());
         }
       }
     }
