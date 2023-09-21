@@ -37,6 +37,7 @@
 
 #pragma once
 
+#include <geometric_shapes/shapes.h>
 #include <moveit/macros/class_forward.h>
 #include <moveit/exceptions/exceptions.h>
 #include <moveit/utils/lexical_casts.h>
@@ -78,6 +79,10 @@ class RobotModel
 {
 public:
   /** \brief Construct a kinematic model from a parsed description and a list of planning groups */
+  RobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model, const srdf::ModelConstSharedPtr& srdf_model,
+             std::string content);
+
+  /** \brief Construct a kinematic model from a parsed description and a list of planning groups */
   RobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model, const srdf::ModelConstSharedPtr& srdf_model);
 
   /** \brief Destructor. Clear all memory. */
@@ -103,6 +108,13 @@ public:
   {
     return root_link_ == nullptr;
   }
+
+  /** \brief  construct padded and scaled URDF model*/
+  urdf::ModelInterfaceSharedPtr createPaddedScaledURDF(const std::map<std::string, double> scales,
+                                                       const std::map<std::string, double> paddings) const;
+
+  /** \brief remove STL file, use after loading padded/scaled URDF model*/
+  void deleteSTLFromURDF(const urdf::ModelInterfaceSharedPtr& urdf_model) const;
 
   /** \brief Get the parsed URDF model */
   const urdf::ModelInterfaceSharedPtr& getURDF() const
@@ -497,6 +509,9 @@ protected:
 
   urdf::ModelInterfaceSharedPtr urdf_;
 
+  /** \brief Content of robot description from parameter server */
+  std::string robot_description_content_;
+
   // LINKS
 
   /** \brief The first physical link for the robot */
@@ -654,6 +669,9 @@ protected:
 
   /** \brief Given a geometry spec from the URDF and a filename (for a mesh), construct the corresponding shape object*/
   shapes::ShapePtr constructShape(const urdf::Geometry* geom);
+
+  /** \brief Given a shape object, construct a geometry spec for the URDF*/
+  urdf::GeometrySharedPtr constructGeometry(const shapes::ShapePtr& shape) const;
 };
 }  // namespace core
 }  // namespace moveit

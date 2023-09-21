@@ -62,6 +62,12 @@ public:
     return robot_description_;
   }
 
+  /** @brief Get the robot_description content from the resolved parameter name*/
+  const std::string& getRobotDescriptionContent() const
+  {
+    return robot_description_content_;
+  }
+
   /** @brief Get the parsed URDF model*/
   const urdf::ModelInterfaceSharedPtr& getURDF() const
   {
@@ -95,6 +101,7 @@ public:
 
 private:
   std::string robot_description_;
+  std::string robot_description_content_;
   srdf::ModelSharedPtr srdf_;
   urdf::ModelInterfaceSharedPtr urdf_;
 };
