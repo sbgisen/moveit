@@ -99,8 +99,7 @@ void RobotModelLoader::configure(const Options& opt)
   {
     const srdf::ModelSharedPtr& srdf =
         rdf_loader_->getSRDF() ? rdf_loader_->getSRDF() : std::make_shared<srdf::Model>();
-    model_ = std::make_shared<moveit::core::RobotModel>(rdf_loader_->getURDF(), srdf,
-                                                        rdf_loader_->getRobotDescriptionContent());
+    model_ = std::make_shared<moveit::core::RobotModel>(rdf_loader_->getURDF(), srdf);
   }
 
   if (model_ && !rdf_loader_->getRobotDescription().empty())

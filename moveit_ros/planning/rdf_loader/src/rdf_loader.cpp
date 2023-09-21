@@ -62,16 +62,16 @@ rdf_loader::RDFLoader::RDFLoader(const std::string& robot_description)
 
   ros::WallTime start = ros::WallTime::now();
   ros::NodeHandle nh("~");
+  std::string content;
 
-  if (!nh.searchParam(robot_description, robot_description_) ||
-      !nh.getParam(robot_description_, robot_description_content_))
+  if (!nh.searchParam(robot_description, robot_description_) || !nh.getParam(robot_description_, content))
   {
     ROS_ERROR_NAMED("rdf_loader", "Robot model parameter not found! Did you remap '%s'?", robot_description.c_str());
     return;
   }
 
   std::unique_ptr<urdf::Model> urdf(new urdf::Model());
-  if (!urdf->initString(robot_description_content_))
+  if (!urdf->initString(content))
   {
     ROS_ERROR_NAMED("rdf_loader", "Unable to parse URDF from parameter '%s'", robot_description_.c_str());
     return;
