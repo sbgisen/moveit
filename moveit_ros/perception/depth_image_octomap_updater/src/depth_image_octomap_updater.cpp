@@ -36,8 +36,6 @@
 
 #include <moveit/depth_image_octomap_updater/depth_image_octomap_updater.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_monitor.h>
-#include <octomap/OcTree.h>
-#include <octomap/math/Vector3.h>
 #include <std_srvs/Empty.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/LinearMath/Vector3.h>
@@ -50,7 +48,6 @@
 #include <cmath>
 #include <iterator>
 #include <memory>
-#include "moveit/mesh_filter/mesh_filter_base.h"
 
 namespace occupancy_map_monitor
 {
