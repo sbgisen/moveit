@@ -546,14 +546,14 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
             if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
             {
-              zz = raytrace_range_ + 0.1;
+              zz = (float)raytrace_range_;
             }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             /* Check if the point is within the specified range */
-            if (zz <= raytrace_range_ && occupancy_min_z_ <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
+            if (zz < raytrace_range_ && occupancy_min_z_ <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
@@ -601,13 +601,13 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x];
             if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
             {
-              zz = raytrace_range_ + 0.1;
+              zz = (float)raytrace_range_;
             }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            if (zz <= raytrace_range_ && occupancy_min_z_ <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
+            if (zz < raytrace_range_ && occupancy_min_z_ <= point_tf.getZ() && point_tf.getZ() <= occupancy_max_z_)
             {
               occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
             }
@@ -665,7 +665,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     for (octomap::OcTree::leaf_iterator it = tree_->begin_leafs(), end = tree_->end_leafs(); it != end; ++it)
     {
       octomap::point3d point = it.getCoordinate();
-      if (sensor_origin.distance(point) > raytrace_range_ + 0.5)
+      if (sensor_origin.distance(point) > raytrace_range_)
       {
         tree_->deleteNode(point, false);
       }
