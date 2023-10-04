@@ -607,7 +607,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x] * 1e-3;
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if (xx == 0 && yy == 0 && zz == 0)
+            if (zz == 0)
               continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
@@ -662,7 +662,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x];
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
-            if (xx == 0 && yy == 0 && zz == 0)
+            if (zz == 0)
               continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
