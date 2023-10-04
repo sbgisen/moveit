@@ -94,8 +94,13 @@ private:
   double near_clipping_plane_distance_;
   double far_clipping_plane_distance_;
   double raytrace_range_;
+  std::string occupancy_frame_;
   double occupancy_min_z_;
   double occupancy_max_z_;
+  double occupancy_max_x_;
+  double occupancy_max_y_;
+  double occupancy_min_x_;
+  double occupancy_min_y_;
   double shadow_threshold_;
   double padding_scale_;
   double padding_offset_;
