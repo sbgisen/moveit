@@ -579,6 +579,8 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if (std::isnan(xx) && std::isnan(yy) && std::isnan(zz))
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             /* Check if the point is within the specified range */
@@ -634,6 +636,8 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if (std::isnan(xx) && std::isnan(yy) && std::isnan(zz))
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             if (zz < raytrace_range_)
