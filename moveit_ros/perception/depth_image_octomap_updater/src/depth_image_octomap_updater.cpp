@@ -104,7 +104,7 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
     readXmlParam(params, "raytrace_range", &raytrace_range_);
-    readXmlParam(params, "occupancy_mim_z", &occupancy_min_z_);
+    readXmlParam(params, "occupancy_min_z", &occupancy_min_z_);
     readXmlParam(params, "occupancy_max_z", &occupancy_max_z_);
     readXmlParam(params, "shadow_threshold", &shadow_threshold_);
     readXmlParam(params, "padding_scale", &padding_scale_);
