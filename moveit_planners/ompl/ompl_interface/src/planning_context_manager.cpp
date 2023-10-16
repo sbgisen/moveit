@@ -69,6 +69,7 @@
 #include <ompl/geometric/planners/prm/LazyPRMstar.h>
 #include <ompl/geometric/planners/prm/SPARS.h>
 #include <ompl/geometric/planners/prm/SPARStwo.h>
+
 #include <ompl/base/ConstrainedSpaceInformation.h>
 #include <ompl/base/spaces/constraint/ProjectedStateSpace.h>
 
@@ -369,7 +370,7 @@ ompl_interface::ModelBasedPlanningContextPtr ompl_interface::PlanningContextMana
 
       // Select the correct type of constraints based on the path constraints in the planning request.
       ompl::base::ConstraintPtr ompl_constraint =
-          ompl_interface::createOMPLConstraint(robot_model_, config.group, req.path_constraints);
+          ompl_interface::createOMPLConstraints(robot_model_, config.group, req.path_constraints);
 
       // Create a constrained state space of type "projected state space".
       // Other types are available, so we probably should add another setting to ompl_planning.yaml
