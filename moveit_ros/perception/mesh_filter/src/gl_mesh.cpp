@@ -73,42 +73,6 @@ mesh_filter::GLMesh::GLMesh(const Mesh& mesh, unsigned int mesh_label)
   glEndList();
 }
 
-mesh_filter::GLMesh::GLMesh(const shapes::Mesh& mesh, unsigned int mesh_label, const Eigen::Isometry3d& origin)
-{
-  if (!mesh.vertex_normals)
-    throw std::runtime_error("Vertex normals are not computed for input mesh. Call computeVertexNormals() before "
-                             "passing as input to mesh_filter.");
-
-  mesh_label_ = mesh_label;
-  list_ = glGenLists(1);
-  glNewList(list_, GL_COMPILE);
-  glBegin(GL_TRIANGLES);
-  glColor4ubv((GLubyte*)&mesh_label_);
-  for (unsigned t_idx = 0; t_idx < mesh.triangle_count; ++t_idx)
-  {
-    unsigned v1 = 3 * mesh.triangles[3 * t_idx];
-    unsigned v2 = 3 * mesh.triangles[3 * t_idx + 1];
-    unsigned v3 = 3 * mesh.triangles[3 * t_idx + 2];
-
-    glNormal3f(mesh.vertex_normals[v1], mesh.vertex_normals[v1 + 1], mesh.vertex_normals[v1 + 2]);
-    Eigen::Vector3d vertex1 =
-        origin * Eigen::Vector3d(mesh.vertices[v1], mesh.vertices[v1 + 1], mesh.vertices[v1 + 2]);
-    glVertex3f(vertex1.x(), vertex1.y(), vertex1.z());
-
-    glNormal3f(mesh.vertex_normals[v2], mesh.vertex_normals[v2 + 1], mesh.vertex_normals[v2 + 2]);
-    Eigen::Vector3d vertex2 =
-        origin * Eigen::Vector3d(mesh.vertices[v2], mesh.vertices[v2 + 1], mesh.vertices[v2 + 2]);
-    glVertex3f(vertex2.x(), vertex2.y(), vertex2.z());
-
-    glNormal3f(mesh.vertex_normals[v3], mesh.vertex_normals[v3 + 1], mesh.vertex_normals[v3 + 2]);
-    Eigen::Vector3d vertex3 =
-        origin * Eigen::Vector3d(mesh.vertices[v3], mesh.vertices[v3 + 1], mesh.vertices[v3 + 2]);
-    glVertex3f(vertex3.x(), vertex3.y(), vertex3.z());
-  }
-  glEnd();
-  glEndList();
-}
-
 mesh_filter::GLMesh::~GLMesh()
 {
   glDeleteLists(list_, 1);
