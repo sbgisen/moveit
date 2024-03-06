@@ -36,6 +36,7 @@
 
 #include <moveit/depth_image_octomap_updater/depth_image_octomap_updater.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_monitor.h>
+#include <std_srvs/Empty.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/LinearMath/Vector3.h>
 #include <tf2/LinearMath/Transform.h>
@@ -44,6 +45,8 @@
 #include <XmlRpcException.h>
 #include <stdint.h>
 
+#include <cmath>
+#include <iterator>
 #include <memory>
 
 namespace occupancy_map_monitor
@@ -58,15 +61,24 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , filtered_depth_transport_(nh_)
   , filtered_label_transport_(nh_)
   , image_topic_("depth")
-  , queue_size_(5)
-  , near_clipping_plane_distance_(0.3)
-  , far_clipping_plane_distance_(5.0)
+  , queue_size_(1)
+  , near_clipping_plane_distance_(0.1)
+  , far_clipping_plane_distance_(3.0)
+  , raytrace_range_(2.0)
+  , occupancy_frame_("")
+  , occupancy_min_z_(0.15)
+  , occupancy_max_z_(2.5)
+  , occupancy_max_x_(std::numeric_limits<double>::max())
+  , occupancy_max_y_(std::numeric_limits<double>::max())
+  , occupancy_min_x_(std::numeric_limits<double>::lowest())
+  , occupancy_min_y_(std::numeric_limits<double>::lowest())
   , shadow_threshold_(0.04)
-  , padding_scale_(0.0)
+  , padding_scale_(1.01)
   , padding_offset_(0.02)
-  , max_update_rate_(0)
+  , max_update_rate_(10)
   , skip_vertical_pixels_(4)
   , skip_horizontal_pixels_(6)
+  , compression_ratio_(4)
   , image_callback_count_(0)
   , average_callback_dt_(0.0)
   , good_tf_(5)
@@ -96,6 +108,15 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
 
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
+    readXmlParam(params, "raytrace_range", &raytrace_range_);
+    if (params.hasMember("occupancy_frame"))
+      occupancy_frame_ = (std::string)params["occupancy_frame"];
+    readXmlParam(params, "occupancy_min_z", &occupancy_min_z_);
+    readXmlParam(params, "occupancy_max_z", &occupancy_max_z_);
+    readXmlParam(params, "occupancy_max_x", &occupancy_max_x_);
+    readXmlParam(params, "occupancy_max_y", &occupancy_max_y_);
+    readXmlParam(params, "occupancy_min_x", &occupancy_min_x_);
+    readXmlParam(params, "occupancy_min_y", &occupancy_min_y_);
     readXmlParam(params, "shadow_threshold", &shadow_threshold_);
     readXmlParam(params, "padding_scale", &padding_scale_);
     readXmlParam(params, "padding_offset", &padding_offset_);
@@ -103,6 +124,7 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
       readXmlParam(params, "max_update_rate", &max_update_rate_);
     readXmlParam(params, "skip_vertical_pixels", &skip_vertical_pixels_);
     readXmlParam(params, "skip_horizontal_pixels", &skip_horizontal_pixels_);
+    readXmlParam(params, "compression_ratio", &compression_ratio_);
     if (params.hasMember("filtered_cloud_topic"))
       filtered_cloud_topic_ = static_cast<const std::string&>(params["filtered_cloud_topic"]);
     if (params.hasMember("ns"))
@@ -119,6 +141,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
 
 bool DepthImageOctomapUpdater::initialize()
 {
+  is_paused_ = false;
+
   tf_buffer_ = monitor_->getTFClient();
   free_space_updater_ = std::make_unique<LazyFreeSpaceUpdater>(tree_);
 
@@ -153,6 +177,8 @@ void DepthImageOctomapUpdater::start()
 
   sub_depth_image_ = input_depth_transport_.subscribeCamera(image_topic_, queue_size_,
                                                             &DepthImageOctomapUpdater::depthImageCallback, this, hints);
+
+  enable_service_ = node_handle_.advertiseService("enable_octomap", &DepthImageOctomapUpdater::enableOctomap, this);
 }
 
 void DepthImageOctomapUpdater::stop()
@@ -163,6 +189,44 @@ void DepthImageOctomapUpdater::stop()
 void DepthImageOctomapUpdater::stopHelper()
 {
   sub_depth_image_.shutdown();
+}
+
+bool DepthImageOctomapUpdater::enableOctomap(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res)
+{
+  if (req.data)
+  {
+    if (is_paused_)
+    {
+      is_paused_ = false;
+      std::string log = "Octomap resumed.";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
+    else
+    {
+      std::string log = "Octomap is already enabled";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
+  }
+  else
+  {
+    if (!is_paused_)
+    {
+      is_paused_ = true;
+      std::string log = "Octomap paused.";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
+    else
+    {
+      std::string log = "Octomap is already paused";
+      ROS_INFO_NAMED(LOGNAME, "%s", log.c_str());
+      res.message = log;
+    }
+  }
+  res.success = true;
+  return true;
 }
 
 mesh_filter::MeshHandle DepthImageOctomapUpdater::excludeShape(const shapes::ShapeConstPtr& shape)
@@ -220,6 +284,10 @@ static const bool HOST_IS_BIG_ENDIAN = host_is_big_endian();
 void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstPtr& depth_msg,
                                                   const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
+  if (is_paused_)
+  {
+    return;
+  }
   ROS_DEBUG_NAMED(LOGNAME, "Received a new depth image message (frame = '%s', encoding='%s')",
                   depth_msg->header.frame_id.c_str(), depth_msg->encoding.c_str());
   ros::WallTime start = ros::WallTime::now();
@@ -246,76 +314,96 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     }
   }
   else
+  {
     // every 1000 updates we reset the counter almost to the beginning (use 2 so we don't have so much of a ripple in
     // the measured average)
     image_callback_count_ = 2;
+  }
   last_depth_callback_start_ = start;
   ++image_callback_count_;
 
   if (monitor_->getMapFrame().empty())
     monitor_->setMapFrame(depth_msg->header.frame_id);
 
-  /* get transform for cloud into map frame */
+  // check if the occupancy_frame exists
+  if (!occupancy_frame_.empty() && !tf_buffer_->_frameExists(occupancy_frame_))
+  {
+    ROS_WARN_NAMED(LOGNAME, "could not find %s frame, ignoring occupancy range parameters", occupancy_frame_.c_str());
+    occupancy_frame_ = "";
+  }
+
+  /* get transform for cloud into map frame, occupancy frame */
   tf2::Stamped<tf2::Transform> map_h_sensor;
+  tf2::Stamped<tf2::Transform> occupancy_h_sensor;
   if (monitor_->getMapFrame() == depth_msg->header.frame_id)
     map_h_sensor.setIdentity();
-  else
+
+  if (tf_buffer_ && ((!occupancy_frame_.empty() && (occupancy_frame_ != monitor_->getMapFrame())) ||
+                     (monitor_->getMapFrame() != depth_msg->header.frame_id)))
   {
-    if (tf_buffer_)
-    {
-      // wait at most 50ms
-      static const double TEST_DT = 0.005;
-      const int nt = (int)(0.5 + average_callback_dt_ / TEST_DT) * std::max(1, ((int)queue_size_ / 2));
-      bool found = false;
-      std::string err;
-      for (int t = 0; t < nt; ++t)
-        try
+    // wait at most 50ms
+    static const double TEST_DT = 0.005;
+    const int nt = (int)(0.5 + average_callback_dt_ / TEST_DT) * std::max(1, ((int)queue_size_ / 2));
+    bool found = false;
+    std::string err;
+    for (int t = 0; t < nt; ++t)
+      try
+      {
+        if (monitor_->getMapFrame() != depth_msg->header.frame_id)
         {
           tf2::fromMsg(tf_buffer_->lookupTransform(monitor_->getMapFrame(), depth_msg->header.frame_id,
                                                    depth_msg->header.stamp),
                        map_h_sensor);
-          found = true;
-          break;
         }
-        catch (tf2::TransformException& ex)
+        if ((!occupancy_frame_.empty()) && (occupancy_frame_ != monitor_->getMapFrame()))
         {
-          static const ros::Duration D(TEST_DT);
-          err = ex.what();
-          D.sleep();
+          tf2::fromMsg(tf_buffer_->lookupTransform(occupancy_frame_, monitor_->getMapFrame(), ros::Time(0)),
+                       occupancy_h_sensor);
         }
-      static const unsigned int MAX_TF_COUNTER = 1000;  // so we avoid int overflow
-      if (found)
-      {
-        good_tf_++;
-        if (good_tf_ > MAX_TF_COUNTER)
-        {
-          const unsigned int div = MAX_TF_COUNTER / 10;
-          good_tf_ /= div;
-          failed_tf_ /= div;
-        }
+        found = true;
+        break;
       }
-      else
+      catch (tf2::TransformException& ex)
       {
-        failed_tf_++;
-        if (failed_tf_ > good_tf_)
-          ROS_WARN_THROTTLE_NAMED(1, LOGNAME,
-                                  "More than half of the image messages discared due to TF being unavailable (%u%%). "
-                                  "Transform error of sensor data: %s; quitting callback.",
-                                  (100 * failed_tf_) / (good_tf_ + failed_tf_), err.c_str());
-        else
-          ROS_DEBUG_THROTTLE_NAMED(1, LOGNAME, "Transform error of sensor data: %s; quitting callback", err.c_str());
-        if (failed_tf_ > MAX_TF_COUNTER)
-        {
-          const unsigned int div = MAX_TF_COUNTER / 10;
-          good_tf_ /= div;
-          failed_tf_ /= div;
-        }
-        return;
+        static const ros::Duration D(TEST_DT);
+        err = ex.what();
+        D.sleep();
+      }
+    static const unsigned int MAX_TF_COUNTER = 1000;  // so we avoid int overflow
+    if (found)
+    {
+      good_tf_++;
+      if (good_tf_ > MAX_TF_COUNTER)
+      {
+        const unsigned int div = MAX_TF_COUNTER / 10;
+        good_tf_ /= div;
+        failed_tf_ /= div;
       }
     }
     else
+    {
+      failed_tf_++;
+      if (failed_tf_ > good_tf_)
+        ROS_WARN_THROTTLE_NAMED(1, LOGNAME,
+                                "More than half of the image messages discared due to TF being unavailable (%u%%). "
+                                "Transform error of sensor data: %s; quitting callback.",
+                                (100 * failed_tf_) / (good_tf_ + failed_tf_), err.c_str());
+      else
+        ROS_DEBUG_THROTTLE_NAMED(1, LOGNAME, "Transform error of sensor data: %s; quitting callback", err.c_str());
+      if (failed_tf_ > MAX_TF_COUNTER)
+      {
+        const unsigned int div = MAX_TF_COUNTER / 10;
+        good_tf_ /= div;
+        failed_tf_ /= div;
+      }
       return;
+    }
   }
+  else
+    return;
+
+  if (occupancy_frame_ == monitor_->getMapFrame())
+    occupancy_h_sensor = map_h_sensor;
 
   if (!updateTransformCache(depth_msg->header.frame_id, depth_msg->header.stamp))
     return;
@@ -364,7 +452,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     inv_fy_ = 1.0 / K4_;
 
     // if there are any NaNs, discard data
-    if (!(px == px && py == py && inv_fx_ == inv_fx_ && inv_fy_ == inv_fy_))
+    if (px != px || py != py || inv_fx_ != inv_fx_ || inv_fy_ != inv_fy_)
       return;
 
     // Pre-compute some constants
@@ -385,8 +473,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
   octomap::KeySet* occupied_cells_ptr = new octomap::KeySet();
   octomap::KeySet* model_cells_ptr = new octomap::KeySet();
+  octomap::KeySet* free_cells_ptr = new octomap::KeySet();
   octomap::KeySet& occupied_cells = *occupied_cells_ptr;
   octomap::KeySet& model_cells = *model_cells_ptr;
+  octomap::KeySet& free_cells = *free_cells_ptr;
 
   // allocate memory if needed
   std::size_t img_size = h * w;
@@ -473,18 +563,43 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     {
       const uint16_t* input_row = reinterpret_cast<const uint16_t*>(&depth_msg->data[0]);
 
-      for (int y = skip_vertical_pixels_; y < h_bound; ++y, labels_row += w, input_row += w)
-        for (int x = skip_horizontal_pixels_; x < w_bound; ++x)
+      for (int y = skip_vertical_pixels_; y < h_bound;
+           y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
+      {
+        for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
           // not filtered
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND)
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
+              labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
           {
             float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
+            if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+            {
+              zz = (float)raytrace_range_;
+            }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if (std::isnan(xx) && std::isnan(yy) && std::isnan(zz))
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            /* Check if the point is within the specified range */
+            if (zz < raytrace_range_)
+            {
+              occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            }
+            else
+            {
+              octomap::KeyRay ray;
+              const octomap::point3d target_point(point_tf.getX(), point_tf.getY(), point_tf.getZ());
+              if (tree_->computeRayKeys(sensor_origin, target_point, ray))
+              {
+                for (auto& it : ray)
+                {
+                  free_cells.insert(it);
+                }
+              }
+            }
           }
           // on far plane or a model point -> remove
           else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
@@ -492,40 +607,70 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
             float zz = input_row[x] * 1e-3;
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if (zz == 0)
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             // add to the list of model cells
             model_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
           }
         }
+      }
     }
     else
     {
       const float* input_row = reinterpret_cast<const float*>(&depth_msg->data[0]);
 
-      for (int y = skip_vertical_pixels_; y < h_bound; ++y, labels_row += w, input_row += w)
-        for (int x = skip_horizontal_pixels_; x < w_bound; ++x)
+      for (int y = skip_vertical_pixels_; y < h_bound;
+           y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
+      {
+        for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND)
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
+              labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
           {
             float zz = input_row[x];
+            if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+            {
+              zz = (float)raytrace_range_;
+            }
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if (std::isnan(xx) && std::isnan(yy) && std::isnan(zz))
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
-            occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            if (zz < raytrace_range_)
+            {
+              occupied_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
+            }
+            else
+            {
+              octomap::KeyRay ray;
+              const octomap::point3d target_point(point_tf.getX(), point_tf.getY(), point_tf.getZ());
+              if (tree_->computeRayKeys(sensor_origin, target_point, ray))
+              {
+                for (auto& it : ray)
+                {
+                  free_cells.insert(it);
+                }
+              }
+            }
           }
           else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
           {
             float zz = input_row[x];
             float yy = y_cache_[y] * zz;
             float xx = x_cache_[x] * zz;
+            if (zz == 0)
+              continue;
             /* transform to map frame */
             tf2::Vector3 point_tf = map_h_sensor * tf2::Vector3(xx, yy, zz);
             // add to the list of model cells
             model_cells.insert(tree_->coordToKey(point_tf.getX(), point_tf.getY(), point_tf.getZ()));
           }
         }
+      }
     }
   }
   catch (...)
@@ -544,9 +689,26 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   tree_->lockWrite();
   try
   {
+    for (const octomap::OcTreeKey& free_cell : free_cells)
+      tree_->updateNode(free_cell, false);
     /* now mark all occupied cells */
     for (const octomap::OcTreeKey& occupied_cell : occupied_cells)
       tree_->updateNode(occupied_cell, true);
+
+    // remove all cells outside of the bounding box
+    if (!occupancy_frame_.empty())
+    {
+      for (octomap::OcTree::leaf_iterator it = tree_->begin_leafs(), end = tree_->end_leafs(); it != end; ++it)
+      {
+        octomap::point3d map_point = it.getCoordinate();
+        tf2::Vector3 point = occupancy_h_sensor * tf2::Vector3(map_point.x(), map_point.y(), map_point.z());
+        if ((point.x() < occupancy_min_x_) || (point.x() > occupancy_max_x_) || (point.y() < occupancy_min_y_) ||
+            (point.y() > occupancy_max_y_) || (point.z() < occupancy_min_z_) || (point.z() > occupancy_max_z_))
+        {
+          tree_->deleteNode(map_point, false);
+        }
+      }
+    }
   }
   catch (...)
   {
