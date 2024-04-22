@@ -235,12 +235,19 @@ mesh_filter::MeshHandle DepthImageOctomapUpdater::excludeShape(const shapes::Sha
   if (mesh_filter_)
   {
     if (shape->type == shapes::MESH)
-      h = mesh_filter_->addMesh(static_cast<const shapes::Mesh&>(*shape));
+    {
+      const shapes::Mesh& mesh = static_cast<const shapes::Mesh&>(*shape);
+      shape->print();
+      if (mesh.vertex_count > 0)
+        h = mesh_filter_->addMesh(mesh);
+    }
     else
     {
-      std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(shape.get()));
-      if (m)
-        h = mesh_filter_->addMesh(*m);
+      std::unique_ptr<shapes::Mesh> mesh_ptr(shapes::createMeshFromShape(shape.get()));
+      if (mesh_ptr)
+      {
+        h = mesh_filter_->addMesh(*mesh_ptr);
+      }
     }
   }
   else
@@ -351,9 +358,9 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       {
         if (monitor_->getMapFrame() != depth_msg->header.frame_id)
         {
-          tf2::fromMsg(tf_buffer_->lookupTransform(monitor_->getMapFrame(), depth_msg->header.frame_id,
-                                                   depth_msg->header.stamp),
-                       map_h_sensor);
+          tf2::fromMsg(
+              tf_buffer_->lookupTransform(monitor_->getMapFrame(), depth_msg->header.frame_id, depth_msg->header.stamp),
+              map_h_sensor);
         }
         if ((!occupancy_frame_.empty()) && (occupancy_frame_ != monitor_->getMapFrame()))
         {
