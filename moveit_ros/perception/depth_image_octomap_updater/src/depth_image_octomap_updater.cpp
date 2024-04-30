@@ -705,7 +705,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
         if ((point.x() < occupancy_min_x_) || (point.x() > occupancy_max_x_) || (point.y() < occupancy_min_y_) ||
             (point.y() > occupancy_max_y_) || (point.z() < occupancy_min_z_) || (point.z() > occupancy_max_z_))
         {
-          tree_->deleteNode(map_point, false);
+          tree_->deleteNode(it.getKey());
         }
       }
     }
