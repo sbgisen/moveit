@@ -65,7 +65,7 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , near_clipping_plane_distance_(0.1)
   , far_clipping_plane_distance_(3.0)
   , raytrace_range_(2.0)
-  , occupancy_frame_("")
+  , base_frame_("")
   , occupancy_min_z_(0.15)
   , occupancy_max_z_(2.5)
   , occupancy_max_x_(std::numeric_limits<double>::max())
@@ -109,8 +109,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
     readXmlParam(params, "raytrace_range", &raytrace_range_);
-    if (params.hasMember("occupancy_frame"))
-      occupancy_frame_ = (std::string)params["occupancy_frame"];
+    if (params.hasMember("base_frame"))
+      base_frame_ = (std::string)params["base_frame"];
     readXmlParam(params, "occupancy_min_z", &occupancy_min_z_);
     readXmlParam(params, "occupancy_max_z", &occupancy_max_z_);
     readXmlParam(params, "occupancy_max_x", &occupancy_max_x_);
@@ -325,11 +325,11 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   if (monitor_->getMapFrame().empty())
     monitor_->setMapFrame(depth_msg->header.frame_id);
 
-  // check if the occupancy_frame exists
-  if (!occupancy_frame_.empty() && !tf_buffer_->_frameExists(occupancy_frame_))
+  // check if the base_frame exists
+  if (!base_frame_.empty() && !tf_buffer_->_frameExists(base_frame_))
   {
-    ROS_WARN_NAMED(LOGNAME, "could not find %s frame, ignoring occupancy range parameters", occupancy_frame_.c_str());
-    occupancy_frame_ = "";
+    ROS_WARN_NAMED(LOGNAME, "could not find %s frame, ignoring occupancy range parameters", base_frame_.c_str());
+    base_frame_ = "";
   }
 
   /* get transform for cloud into map frame, occupancy frame */
@@ -338,7 +338,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   if (monitor_->getMapFrame() == depth_msg->header.frame_id)
     map_h_sensor.setIdentity();
 
-  if (tf_buffer_ && ((!occupancy_frame_.empty() && (occupancy_frame_ != monitor_->getMapFrame())) ||
+  if (tf_buffer_ && ((!base_frame_.empty() && (base_frame_ != monitor_->getMapFrame())) ||
                      (monitor_->getMapFrame() != depth_msg->header.frame_id)))
   {
     // wait at most 50ms
@@ -355,9 +355,9 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
                                                    depth_msg->header.stamp),
                        map_h_sensor);
         }
-        if ((!occupancy_frame_.empty()) && (occupancy_frame_ != monitor_->getMapFrame()))
+        if ((!base_frame_.empty()) && (base_frame_ != monitor_->getMapFrame()))
         {
-          tf2::fromMsg(tf_buffer_->lookupTransform(occupancy_frame_, monitor_->getMapFrame(), ros::Time(0)),
+          tf2::fromMsg(tf_buffer_->lookupTransform(base_frame_, monitor_->getMapFrame(), ros::Time(0)),
                        occupancy_h_sensor);
         }
         found = true;
@@ -402,7 +402,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   else
     return;
 
-  if (occupancy_frame_ == monitor_->getMapFrame())
+  if (base_frame_ == monitor_->getMapFrame())
     occupancy_h_sensor = map_h_sensor;
 
   if (!updateTransformCache(depth_msg->header.frame_id, depth_msg->header.stamp))
@@ -696,7 +696,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       tree_->updateNode(occupied_cell, true);
 
     // remove all cells outside of the bounding box
-    if (!occupancy_frame_.empty())
+    if (!base_frame_.empty())
     {
       for (octomap::OcTree::leaf_iterator it = tree_->begin_leafs(), end = tree_->end_leafs(); it != end; ++it)
       {

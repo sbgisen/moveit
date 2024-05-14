@@ -94,7 +94,7 @@ private:
   double near_clipping_plane_distance_;
   double far_clipping_plane_distance_;
   double raytrace_range_;
-  std::string occupancy_frame_;
+  std::string base_frame_;
   double occupancy_min_z_;
   double occupancy_max_z_;
   double occupancy_max_x_;
