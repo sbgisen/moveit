@@ -65,7 +65,7 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , near_clipping_plane_distance_(0.1)
   , far_clipping_plane_distance_(3.0)
   , raytrace_range_(2.0)
-  , base_frame_("")
+  , occupancy_frame_("")
   , occupancy_min_z_(0.15)
   , occupancy_max_z_(2.5)
   , occupancy_max_x_(std::numeric_limits<double>::max())
@@ -109,8 +109,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
     readXmlParam(params, "near_clipping_plane_distance", &near_clipping_plane_distance_);
     readXmlParam(params, "far_clipping_plane_distance", &far_clipping_plane_distance_);
     readXmlParam(params, "raytrace_range", &raytrace_range_);
-    if (params.hasMember("base_frame"))
-      base_frame_ = (std::string)params["base_frame"];
+    if (params.hasMember("occupancy_frame"))
+      occupancy_frame_ = (std::string)params["occupancy_frame"];
     readXmlParam(params, "occupancy_min_z", &occupancy_min_z_);
     readXmlParam(params, "occupancy_max_z", &occupancy_max_z_);
     readXmlParam(params, "occupancy_max_x", &occupancy_max_x_);
@@ -352,7 +352,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
                          transform_sensor2map);
             found_sensor2map = true;
           }
-          if (base_frame_.empty() || base_frame_ == monitor_->getMapFrame())
+          if (occupancy_frame_.empty() || occupancy_frame_ == monitor_->getMapFrame())
           {
             if (found_sensor2map)
             {
@@ -360,9 +360,9 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
               found_map2base = true;
             }
           }
-          else if (tf_buffer_->canTransform(base_frame_, monitor_->getMapFrame(), ros::Time(0)))
+          else if (tf_buffer_->canTransform(occupancy_frame_, monitor_->getMapFrame(), ros::Time(0)))
           {
-            tf2::fromMsg(tf_buffer_->lookupTransform(base_frame_, monitor_->getMapFrame(), ros::Time(0)),
+            tf2::fromMsg(tf_buffer_->lookupTransform(occupancy_frame_, monitor_->getMapFrame(), ros::Time(0)),
                          transform_map2base);
             found_map2base = true;
           }
@@ -378,7 +378,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
                        monitor_->getMapFrame().c_str());
             if (!found_map2base)
               ROS_WARN("Could not get transform from map[%s] to base[%s] frame", monitor_->getMapFrame().c_str(),
-                       base_frame_.c_str());
+                       occupancy_frame_.c_str());
             static const ros::Duration D(tf_wait_interval);
             D.sleep();
           }
