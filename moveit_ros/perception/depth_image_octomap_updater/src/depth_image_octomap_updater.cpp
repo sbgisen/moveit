@@ -356,7 +356,6 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
           {
             if (found_sensor2map)
             {
-              transform_map2base.setIdentity();
               found_map2base = true;
             }
           }
