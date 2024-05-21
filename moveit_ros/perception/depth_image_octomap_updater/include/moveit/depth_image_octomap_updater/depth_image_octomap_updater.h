@@ -39,6 +39,7 @@
 #include <ros/ros.h>
 #include <ros/service_server.h>
 #include <tf2_ros/buffer.h>
+#include <tf2/LinearMath/Transform.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_updater.h>
 #include <moveit/mesh_filter/mesh_filter.h>
 #include <moveit/mesh_filter/stereo_camera_model.h>
