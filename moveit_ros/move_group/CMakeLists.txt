@@ -4,6 +4,7 @@ project(moveit_ros_move_group)
 find_package(Boost REQUIRED system filesystem date_time program_options thread)
 find_package(catkin REQUIRED COMPONENTS
   moveit_core
+  moveit_msgs
   moveit_ros_planning
   actionlib
   roscpp
