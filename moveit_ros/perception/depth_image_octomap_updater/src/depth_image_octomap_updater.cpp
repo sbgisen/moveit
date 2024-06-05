@@ -554,33 +554,27 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       unsigned int visualize_color = 0;
       if (labels[i] == mesh_filter::MeshFilterBase::NEAR_CLIP)
       {
-        // Black
         visualize_color = 0x000000FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::FOREGROUND)
       {
-        // White
-        visualize_color = 0xFFFFFFFF;
+        visualize_color = 0x202020FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::MODEL)
       {
-        // Blue
         visualize_color = 0x0000FFFF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::SHADOW)
       {
-        // Gray
         visualize_color = 0x808080FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::BACKGROUND)
       {
-        // White
-        visualize_color = 0xFFFFFFFF;
+        visualize_color = 0xA0A0A0FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::FAR_CLIP)
       {
-        // Black
-        visualize_color = 0x000000FF;
+        visualize_color = 0xFFFFFFFF;
       }
       else
       {
