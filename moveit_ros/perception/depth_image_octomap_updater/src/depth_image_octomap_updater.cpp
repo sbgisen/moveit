@@ -541,51 +541,63 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     label_msg.height = h;
     label_msg.width = w;
     label_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    label_msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-    label_msg.step = w * sizeof(unsigned short);
-    label_msg.data.resize(img_size * sizeof(unsigned short));
+    label_msg.encoding = sensor_msgs::image_encodings::RGBA8;
+    label_msg.step = w * sizeof(unsigned int);
+    label_msg.data.resize(img_size * sizeof(unsigned int));
     std::vector<unsigned int> labels(img_size, 0);
     mesh_filter_->getFilteredLabels(reinterpret_cast<unsigned int*>(&labels[0]));
     for (std::size_t i = 0; i < img_size; ++i)
     {
-      unsigned short visualize_distance;
+      unsigned int visualize_color = 0;
       if (labels[i] == mesh_filter::MeshFilterBase::NEAR_CLIP)
       {
-        visualize_distance = 1000;
+        // Black
+        visualize_color = 0x000000FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::FOREGROUND)
       {
-        visualize_distance = 1250;
+        // White
+        visualize_color = 0xFFFFFFFF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::MODEL)
       {
-        visualize_distance = 1500;
+        // Blue
+        visualize_color = 0x0000FFFF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::SHADOW)
       {
-        visualize_distance = 1750;
+        // Gray
+        visualize_color = 0x808080FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::BACKGROUND)
       {
-        visualize_distance = 2000;
+        // White
+        visualize_color = 0xFFFFFFFF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::FAR_CLIP)
       {
-        visualize_distance = 2250;
+        // Black
+        visualize_color = 0x000000FF;
       }
       else
       {
-        visualize_distance = 2500;
+        // Red
+        visualize_color = 0xFF0000FF;
       }
+
       if (HOST_IS_BIG_ENDIAN)
       {
-        label_msg.data[i * sizeof(unsigned short)] = visualize_distance >> 8;
-        label_msg.data[i * sizeof(unsigned short) + 1] = visualize_distance & 0xFF;
+        label_msg.data[i * sizeof(unsigned int) + 3] = (visualize_color >> 24) & 0xFF;
+        label_msg.data[i * sizeof(unsigned int) + 2] = (visualize_color >> 16) & 0xFF;
+        label_msg.data[i * sizeof(unsigned int) + 1] = (visualize_color >> 8) & 0xFF;
+        label_msg.data[i * sizeof(unsigned int)] = visualize_color & 0xFF;
       }
       else
       {
-        label_msg.data[i * sizeof(unsigned short) + 1] = visualize_distance >> 8;
-        label_msg.data[i * sizeof(unsigned short)] = visualize_distance & 0xFF;
+        label_msg.data[i * sizeof(unsigned int)] = (visualize_color >> 24) & 0xFF;
+        label_msg.data[i * sizeof(unsigned int) + 1] = (visualize_color >> 16) & 0xFF;
+        label_msg.data[i * sizeof(unsigned int) + 2] = (visualize_color >> 8) & 0xFF;
+        label_msg.data[i * sizeof(unsigned int) + 3] = visualize_color & 0xFF;
       }
     }
     pub_filtered_label_image_.publish(label_msg, *info_msg);
