@@ -36,6 +36,7 @@
 
 #include <moveit/depth_image_octomap_updater/depth_image_octomap_updater.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_monitor.h>
+#include <sensor_msgs/Image.h>
 #include <std_srvs/Empty.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/LinearMath/Vector3.h>
@@ -89,6 +90,7 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , K4_(0.0)
   , K5_(0.0)
   , enable_model_clearing_(true)
+  , enable_no_data_clearing_(false)
 {
 }
 
@@ -132,6 +134,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
       ns_ = static_cast<const std::string&>(params["ns"]);
     if (params.hasMember("enable_model_clearing"))
       enable_model_clearing_ = static_cast<bool>(params["enable_model_clearing"]);
+    if (params.hasMember("enable_no_data_clearing"))
+      enable_no_data_clearing_ = static_cast<bool>(params["enable_no_data_clearing"]);
   }
   catch (XmlRpc::XmlRpcException& ex)
   {
@@ -438,6 +442,33 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
   const int w = depth_msg->width;
   const int h = depth_msg->height;
+  std::vector<uint8_t> depth_data = depth_msg->data;
+
+  if (enable_no_data_clearing_)
+  {
+    if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1)
+    {
+      uint16_t* depth_array = reinterpret_cast<uint16_t*>(&depth_data[0]);
+      for (int i = 0; i < w * h; ++i)
+      {
+        if (depth_array[i] == 0 || !std::isfinite(depth_array[i]))
+        {
+          depth_array[i] = std::numeric_limits<uint16_t>::max();
+        }
+      }
+    }
+    else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
+    {
+      float* depth_array = reinterpret_cast<float*>(&depth_data[0]);
+      for (int i = 0; i < w * h; ++i)
+      {
+        if (depth_array[i] == 0.0f || std::isnan(depth_array[i]) || std::isinf(depth_array[i]))
+        {
+          depth_array[i] = std::numeric_limits<float>::max();
+        }
+      }
+    }
+  }
 
   // call the mesh filter
   mesh_filter::StereoCameraModel::Parameters& params = mesh_filter_->parameters();
@@ -446,7 +477,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
   const bool is_u_short = depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1;
   if (is_u_short)
-    mesh_filter_->filter(&depth_msg->data[0], GL_UNSIGNED_SHORT);
+    mesh_filter_->filter(&depth_data[0], GL_UNSIGNED_SHORT);
   else
   {
     if (depth_msg->encoding != sensor_msgs::image_encodings::TYPE_32FC1)
@@ -455,7 +486,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
                                depth_msg->encoding.c_str());
       return;
     }
-    mesh_filter_->filter(&depth_msg->data[0], GL_FLOAT);
+    mesh_filter_->filter(&depth_data[0], GL_FLOAT);
   }
 
   // the mesh filter runs in background; compute extra things in the meantime
@@ -623,7 +654,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
     if (is_u_short)
     {
-      const uint16_t* input_row = reinterpret_cast<const uint16_t*>(&depth_msg->data[0]);
+      const uint16_t* input_row = reinterpret_cast<const uint16_t*>(&depth_data[0]);
       for (int y = skip_vertical_pixels_; y < h_bound;
            y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
       {
@@ -699,7 +730,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     }
     else
     {
-      const float* input_row = reinterpret_cast<const float*>(&depth_msg->data[0]);
+      const float* input_row = reinterpret_cast<const float*>(&depth_data[0]);
       for (int y = skip_vertical_pixels_; y < h_bound;
            y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
       {
@@ -831,4 +862,5 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
 
   ROS_DEBUG_NAMED(LOGNAME, "Processed depth image in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
 }
+
 }  // namespace occupancy_map_monitor
