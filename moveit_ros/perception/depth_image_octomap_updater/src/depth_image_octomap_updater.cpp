@@ -637,24 +637,33 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
           {
             zz = raytrace_range_;
           }
+          if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+          {
+            continue;
+          }
           float yy = y_cache_[y] * zz;
           float xx = x_cache_[x] * zz;
           tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
           tf2::Vector3 base2point = transform_map2base * map2point;
           // Raytrace from the sensor origin to the target point
+          float ray_zz =
+              zz - tree_->getResolution() * 1.7320508;  // TODO: This is a hack to avoid raytracing to the same point
+          float ray_yy = y_cache_[y] * ray_zz;
+          float ray_xx = x_cache_[x] * ray_zz;
+          tf2::Vector3 ray_target_map2point = transform_sensor2map * tf2::Vector3(ray_xx, ray_yy, ray_zz);
+          const octomap::point3d ray_target_point(ray_target_map2point.getX(), ray_target_map2point.getY(),
+                                                  ray_target_map2point.getZ());
           octomap::KeyRay ray;
-          const octomap::point3d target_point(map2point.getX(), map2point.getY(), map2point.getZ());
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND &&
-              tree_->computeRayKeys(sensor_origin, target_point, ray))
+          if (tree_->computeRayKeys(sensor_origin, ray_target_point, ray))
           {
             for (auto& it : ray)
             {
               octomap::point3d it_point = tree_->keyToCoord(it);
-              map2point = tf2::Vector3(it_point.x(), it_point.y(), it_point.z());
-              base2point = transform_map2base * map2point;
-              if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
-                  base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
-                  base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
+              tf2::Vector3 ray_map2point = tf2::Vector3(it_point.x(), it_point.y(), it_point.z());
+              tf2::Vector3 ray_base2point = transform_map2base * ray_map2point;
+              if (ray_base2point.x() > occupancy_min_x_ && ray_base2point.x() < occupancy_max_x_ &&
+                  ray_base2point.y() > occupancy_min_y_ && ray_base2point.y() < occupancy_max_y_ &&
+                  ray_base2point.z() > occupancy_min_z_ && ray_base2point.z() < occupancy_max_z_)
               {
                 free_cells.insert(it);
               }
@@ -704,24 +713,33 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
           {
             zz = raytrace_range_;
           }
+          if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+          {
+            continue;
+          }
           float yy = y_cache_[y] * zz;
           float xx = x_cache_[x] * zz;
           tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
           tf2::Vector3 base2point = transform_map2base * map2point;
           // Raytrace from the sensor origin to the target point
+          float ray_zz =
+              zz - tree_->getResolution() * 1.7320508;  // TODO: This is a hack to avoid raytracing to the same point
+          float ray_yy = y_cache_[y] * ray_zz;
+          float ray_xx = x_cache_[x] * ray_zz;
+          tf2::Vector3 ray_target_map2point = transform_sensor2map * tf2::Vector3(ray_xx, ray_yy, ray_zz);
+          const octomap::point3d ray_target_point(ray_target_map2point.getX(), ray_target_map2point.getY(),
+                                                  ray_target_map2point.getZ());
           octomap::KeyRay ray;
-          const octomap::point3d target_point(map2point.getX(), map2point.getY(), map2point.getZ());
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND &&
-              tree_->computeRayKeys(sensor_origin, target_point, ray))
+          if (tree_->computeRayKeys(sensor_origin, ray_target_point, ray))
           {
             for (auto& it : ray)
             {
               octomap::point3d it_point = tree_->keyToCoord(it);
-              map2point = tf2::Vector3(it_point.x(), it_point.y(), it_point.z());
-              base2point = transform_map2base * map2point;
-              if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
-                  base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
-                  base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
+              tf2::Vector3 ray_map2point = tf2::Vector3(it_point.x(), it_point.y(), it_point.z());
+              tf2::Vector3 ray_base2point = transform_map2base * ray_map2point;
+              if (ray_base2point.x() > occupancy_min_x_ && ray_base2point.x() < occupancy_max_x_ &&
+                  ray_base2point.y() > occupancy_min_y_ && ray_base2point.y() < occupancy_max_y_ &&
+                  ray_base2point.z() > occupancy_min_z_ && ray_base2point.z() < occupancy_max_z_)
               {
                 free_cells.insert(it);
               }
@@ -746,7 +764,6 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
           else if (labels_row[x] == mesh_filter::MeshFilterBase::MODEL ||
                    labels_row[x] == mesh_filter::MeshFilterBase::SHADOW)
           {
-            // Skip points that are outside of the bounding box
             tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
             tf2::Vector3 base2point = transform_map2base * map2point;
             if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
@@ -810,7 +827,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   tree_->triggerUpdateCallback();
 
   // at this point we still have not freed the space
-  free_space_updater_->pushLazyUpdate(occupied_cells_ptr, model_cells_ptr, sensor_origin);
+  // free_space_updater_->pushLazyUpdate(occupied_cells_ptr, model_cells_ptr, sensor_origin);
 
   ROS_DEBUG_NAMED(LOGNAME, "Processed depth image in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
 }
