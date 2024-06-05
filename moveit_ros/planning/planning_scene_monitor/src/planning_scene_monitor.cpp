@@ -570,6 +570,7 @@ void PlanningSceneMonitor::clearBBXOctomap(const octomap::point3d& min, const oc
     octomap_monitor_->getOcTreePtr()->lockWrite();
     octomap_monitor_->getOcTreePtr()->clearBBX(min, max);
     octomap_monitor_->getOcTreePtr()->unlockWrite();
+    octomap_monitor_->getOcTreePtr()->triggerUpdateCallback();
   }
   else
   {
@@ -607,6 +608,7 @@ void PlanningSceneMonitor::clearPrimitivesOctomap(const std::vector<shape_msgs::
     }
   }
   octomap_monitor_->getOcTreePtr()->unlockWrite();
+  octomap_monitor_->getOcTreePtr()->triggerUpdateCallback();
 }
 
 bool PlanningSceneMonitor::newPlanningSceneMessage(const moveit_msgs::PlanningScene& scene)
