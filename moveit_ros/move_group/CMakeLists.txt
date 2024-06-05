@@ -56,6 +56,8 @@ add_library(moveit_move_group_default_capabilities
   src/default_capabilities/get_planning_scene_service_capability.cpp
   src/default_capabilities/apply_planning_scene_service_capability.cpp
   src/default_capabilities/clear_octomap_service_capability.cpp
+  src/default_capabilities/clear_bbx_octomap_service_capability.cpp
+  src/default_capabilities/clear_primitives_octomap_service_capability.cpp
   src/default_capabilities/tf_publisher_capability.cpp
   )
 set_target_properties(moveit_move_group_default_capabilities PROPERTIES VERSION "${${PROJECT_NAME}_VERSION}")

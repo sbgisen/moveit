@@ -409,6 +409,10 @@ public:
 
   void clearOctomap();
 
+  void clearBBXOctomap(const octomap::point3d& min, const octomap::point3d& max);
+  void clearPrimitivesOctomap(const std::vector<shape_msgs::SolidPrimitive>& primitives,
+                              const std::vector<geometry_msgs::Pose>& poses);
+
   // Called to update the planning scene with a new message.
   bool newPlanningSceneMessage(const moveit_msgs::PlanningScene& scene);
 

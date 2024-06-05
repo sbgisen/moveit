@@ -66,7 +66,23 @@
     </description>
   </class>
 
-  <class name="move_group/TfPublisher" type="move_group::TfPublisher" base_class_type="move_group::MoveGroupCapability">
+  <class name="move_group/ClearBBXOctomapService" type="move_group::ClearBBXOctomapService"
+    base_class_type="move_group::MoveGroupCapability">
+    <description>
+      Provide a ROS service that allows for clearing bounding box from the octomap
+    </description>
+  </class>
+
+  <class name="move_group/ClearPrimitivesOctomapService"
+    type="move_group::ClearPrimitivesOctomapService"
+    base_class_type="move_group::MoveGroupCapability">
+    <description>
+      Provide a ROS service that allows for clearing shapes from the octomap
+    </description>
+  </class>
+
+  <class name="move_group/TfPublisher" type="move_group::TfPublisher"
+    base_class_type="move_group::MoveGroupCapability">
     <description>
       Provide a capability that publishes PlanningScene frames to the tf system
     </description>

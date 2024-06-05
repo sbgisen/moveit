@@ -34,6 +34,7 @@
 
 /* Author: Ioan Sucan */
 
+#include <geometric_shapes/shape_operations.h>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/utils/message_checks.h>
@@ -288,8 +289,9 @@ void PlanningSceneMonitor::monitorDiffs(bool flag)
     {
       if (publish_planning_scene_)
       {
-        ROS_WARN_NAMED(LOGNAME, "Diff monitoring was stopped while publishing planning scene diffs. "
-                                "Stopping planning scene diff publisher");
+        ROS_WARN_NAMED(LOGNAME,
+                       "Diff monitoring was stopped while publishing planning scene diffs. "
+                       "Stopping planning scene diff publisher");
         stopPublishingPlanningScene();
       }
       {
@@ -502,9 +504,10 @@ bool PlanningSceneMonitor::requestPlanningSceneState(const std::string& service_
   }
   else
   {
-    ROS_INFO_NAMED(
-        LOGNAME, "Failed to call service %s, have you launched move_group or called psm.providePlanningSceneService()?",
-        service_name.c_str());
+    ROS_INFO_NAMED(LOGNAME,
+                   "Failed to call service %s, have you launched move_group or called "
+                   "psm.providePlanningSceneService()?",
+                   service_name.c_str());
     return false;
   }
   return true;
@@ -558,6 +561,52 @@ void PlanningSceneMonitor::clearOctomap()
 
   if (removed)
     triggerSceneUpdateEvent(UPDATE_GEOMETRY);
+}
+
+void PlanningSceneMonitor::clearBBXOctomap(const octomap::point3d& min, const octomap::point3d& max)
+{
+  if (octomap_monitor_)
+  {
+    octomap_monitor_->getOcTreePtr()->lockWrite();
+    octomap_monitor_->getOcTreePtr()->clearBBX(min, max);
+    octomap_monitor_->getOcTreePtr()->unlockWrite();
+  }
+  else
+  {
+    ROS_WARN_NAMED(LOGNAME, "Unable to clear octomap since no octomap monitor has been initialized");
+  }
+}
+
+void PlanningSceneMonitor::clearPrimitivesOctomap(const std::vector<shape_msgs::SolidPrimitive>& primitives,
+                                                  const std::vector<geometry_msgs::Pose>& poses)
+
+{
+  if (!octomap_monitor_)
+  {
+    ROS_WARN_NAMED(LOGNAME, "Unable to clear octomap since no octomap monitor has been initialized");
+    return;
+  }
+  if (primitives.size() != poses.size() || primitives.size() == 0)
+  {
+    ROS_ERROR_NAMED(LOGNAME, "Number of primitives does not match number of poses");
+    return;
+  }
+
+  octomap_monitor_->getOcTreePtr()->lockWrite();
+  ROS_INFO("Clearing %zu primitives from octomap", primitives.size());
+  for (size_t i = 0; i < primitives.size(); ++i)
+  {
+    ROS_INFO("Clearing primitive %zu (type = %d) from octomap", i, primitives[i].type);
+    shapes::ShapeConstPtr shape_const(shapes::constructShapeFromMsg(primitives[i]));
+    if (shape_const)
+    {
+      Eigen::Isometry3d origin;
+      tf2::fromMsg(poses[i], origin);
+      ROS_INFO("Origin: %f %f %f", origin.translation().x(), origin.translation().y(), origin.translation().z());
+      octomap_monitor_->getOcTreePtr()->clearShape(shape_const, origin);
+    }
+  }
+  octomap_monitor_->getOcTreePtr()->unlockWrite();
 }
 
 bool PlanningSceneMonitor::newPlanningSceneMessage(const moveit_msgs::PlanningScene& scene)
@@ -780,7 +829,8 @@ void PlanningSceneMonitor::includeWorldObjectsInOctree()
   boost::recursive_mutex::scoped_lock _(shape_handles_lock_);
 
   // clear information about any attached object
-  for (std::pair<const std::string, std::vector<std::pair<occupancy_map_monitor::ShapeHandle, const Eigen::Isometry3d*>>>&
+  for (std::pair<const std::string,
+                 std::vector<std::pair<occupancy_map_monitor::ShapeHandle, const Eigen::Isometry3d*>>>&
            collision_body_shape_handle : collision_body_shape_handles_)
     for (std::pair<occupancy_map_monitor::ShapeHandle, const Eigen::Isometry3d*>& it :
          collision_body_shape_handle.second)
@@ -1075,8 +1125,9 @@ void PlanningSceneMonitor::startWorldGeometryMonitor(const std::string& collisio
                                                      const bool load_octomap_monitor)
 {
   stopWorldGeometryMonitor();
-  ROS_INFO_NAMED(LOGNAME, "Starting world geometry update monitor for collision objects, attached objects, octomap "
-                          "updates.");
+  ROS_INFO_NAMED(LOGNAME,
+                 "Starting world geometry update monitor for collision objects, attached objects, octomap "
+                 "updates.");
 
   // Listen to the /collision_objects topic to detect requests to add/remove/update collision objects to/from the world
   if (!collision_objects_topic.empty())
@@ -1448,14 +1499,15 @@ void PlanningSceneMonitor::configureDefaultPadding()
         nh_.hasParam(old_robot_description + "_planning/default_robot_link_padding") ||
         nh_.hasParam(old_robot_description + "_planning/default_robot_link_scale"))
     {
-      ROS_WARN_STREAM_NAMED(LOGNAME, "The path for the padding parameters has changed!\n"
-                                     "Old parameter path: '"
-                                         << nh_.resolveName(old_robot_description + "_planning/")
-                                         << "'\n"
-                                            "New parameter path: '"
-                                         << nh_.resolveName(robot_description_ + "_planning/")
-                                         << "'\n"
-                                            "Ignoring old parameters. Please update your moveit config!");
+      ROS_WARN_STREAM_NAMED(LOGNAME,
+                            "The path for the padding parameters has changed!\n"
+                            "Old parameter path: '"
+                                << nh_.resolveName(old_robot_description + "_planning/")
+                                << "'\n"
+                                   "New parameter path: '"
+                                << nh_.resolveName(robot_description_ + "_planning/")
+                                << "'\n"
+                                   "Ignoring old parameters. Please update your moveit config!");
     }
   }
 
