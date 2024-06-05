@@ -70,10 +70,12 @@ public:
   // this would allow me to do a single comparison instead of 3, in the code i write
   enum
   {
-    BACKGROUND = 0,
-    SHADOW = 1,
-    NEAR_CLIP = 2,
-    FAR_CLIP = 3,
+    NEAR_CLIP = 0,
+    FOREGROUND = 1,
+    MODEL = 2,
+    SHADOW = 3,
+    BACKGROUND = 4,
+    FAR_CLIP = 5,
     FIRST_LABEL = 16
   };
 
