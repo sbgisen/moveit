@@ -109,6 +109,7 @@ private:
   unsigned int skip_vertical_pixels_;
   unsigned int skip_horizontal_pixels_;
   unsigned int compression_ratio_;
+  bool enable_model_clearing_;
 
   unsigned int image_callback_count_;
   double average_callback_dt_;

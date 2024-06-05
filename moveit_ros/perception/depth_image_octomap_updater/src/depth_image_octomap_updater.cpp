@@ -88,6 +88,7 @@ DepthImageOctomapUpdater::DepthImageOctomapUpdater()
   , K2_(0.0)
   , K4_(0.0)
   , K5_(0.0)
+  , enable_model_clearing_(true)
 {
 }
 
@@ -129,6 +130,8 @@ bool DepthImageOctomapUpdater::setParams(XmlRpc::XmlRpcValue& params)
       filtered_cloud_topic_ = static_cast<const std::string&>(params["filtered_cloud_topic"]);
     if (params.hasMember("ns"))
       ns_ = static_cast<const std::string&>(params["ns"]);
+    if (params.hasMember("enable_model_clearing"))
+      enable_model_clearing_ = static_cast<bool>(params["enable_model_clearing"]);
   }
   catch (XmlRpc::XmlRpcException& ex)
   {
@@ -827,7 +830,10 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   tree_->triggerUpdateCallback();
 
   // at this point we still have not freed the space
-  // free_space_updater_->pushLazyUpdate(occupied_cells_ptr, model_cells_ptr, sensor_origin);
+  if (enable_model_clearing_)
+  {
+    free_space_updater_->pushLazyUpdate(occupied_cells_ptr, model_cells_ptr, sensor_origin);
+  }
 
   ROS_DEBUG_NAMED(LOGNAME, "Processed depth image in %lf ms", (ros::WallTime::now() - start).toSec() * 1000.0);
 }
