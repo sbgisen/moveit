@@ -514,27 +514,27 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   // publish debug information if needed
   if (debug_info_)
   {
-    sensor_msgs::Image debug_msg;
-    debug_msg.header = depth_msg->header;
-    debug_msg.height = h;
-    debug_msg.width = w;
-    debug_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    debug_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-    debug_msg.step = w * sizeof(float);
-    debug_msg.data.resize(img_size * sizeof(float));
-    mesh_filter_->getModelDepth(reinterpret_cast<float*>(&debug_msg.data[0]));
-    pub_model_depth_image_.publish(debug_msg, *info_msg);
+    sensor_msgs::Image model_msg;
+    model_msg.header = depth_msg->header;
+    model_msg.height = h;
+    model_msg.width = w;
+    model_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
+    model_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+    model_msg.step = w * sizeof(float);
+    model_msg.data.resize(img_size * sizeof(float));
+    mesh_filter_->getModelDepth(reinterpret_cast<float*>(&model_msg.data[0]));
+    pub_model_depth_image_.publish(model_msg, *info_msg);
 
-    sensor_msgs::Image filtered_depth_msg;
-    filtered_depth_msg.header = depth_msg->header;
-    filtered_depth_msg.height = h;
-    filtered_depth_msg.width = w;
-    filtered_depth_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    filtered_depth_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-    filtered_depth_msg.step = w * sizeof(float);
-    filtered_depth_msg.data.resize(img_size * sizeof(float));
-    mesh_filter_->getFilteredDepth(reinterpret_cast<float*>(&filtered_depth_msg.data[0]));
-    pub_filtered_depth_image_.publish(filtered_depth_msg, *info_msg);
+    sensor_msgs::Image filtered_msg;
+    filtered_msg.header = depth_msg->header;
+    filtered_msg.height = h;
+    filtered_msg.width = w;
+    filtered_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
+    filtered_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+    filtered_msg.step = w * sizeof(float);
+    filtered_msg.data.resize(img_size * sizeof(float));
+    mesh_filter_->getFilteredDepth(reinterpret_cast<float*>(&filtered_msg.data[0]));
+    pub_filtered_depth_image_.publish(filtered_msg, *info_msg);
 
     sensor_msgs::Image label_msg;
     label_msg.header = depth_msg->header;
@@ -604,16 +604,16 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   }
   else if (!filtered_cloud_topic_.empty())
   {
-    sensor_msgs::Image filtered_depth_msg;
-    filtered_depth_msg.header = depth_msg->header;
-    filtered_depth_msg.height = h;
-    filtered_depth_msg.width = w;
-    filtered_depth_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
-    filtered_depth_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-    filtered_depth_msg.step = w * sizeof(float);
-    filtered_depth_msg.data.resize(img_size * sizeof(float));
-    mesh_filter_->getFilteredDepth(reinterpret_cast<float*>(&filtered_depth_msg.data[0]));
-    pub_filtered_depth_image_.publish(filtered_depth_msg, *info_msg);
+    sensor_msgs::Image filtered_msg;
+    filtered_msg.header = depth_msg->header;
+    filtered_msg.height = h;
+    filtered_msg.width = w;
+    filtered_msg.is_bigendian = HOST_IS_BIG_ENDIAN;
+    filtered_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+    filtered_msg.step = w * sizeof(float);
+    filtered_msg.data.resize(img_size * sizeof(float));
+    mesh_filter_->getFilteredDepth(reinterpret_cast<float*>(&filtered_msg.data[0]));
+    pub_filtered_depth_image_.publish(filtered_msg, *info_msg);
   }
 
   // figure out occupied cells and model cells
