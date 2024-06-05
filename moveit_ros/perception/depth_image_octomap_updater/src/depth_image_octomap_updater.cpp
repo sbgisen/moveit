@@ -627,71 +627,66 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     if (is_u_short)
     {
       const uint16_t* input_row = reinterpret_cast<const uint16_t*>(&depth_msg->data[0]);
-
       for (int y = skip_vertical_pixels_; y < h_bound;
            y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
       {
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
-          // not filtered
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
-              labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+          float zz = (float)input_row[x] * 1e-3;
+          if (!std::isfinite(zz) || zz <= 0 || zz > raytrace_range_)
           {
-            float zz = (float)input_row[x] * 1e-3;  // scale from mm to m
-            if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+            zz = raytrace_range_;
+          }
+          float yy = y_cache_[y] * zz;
+          float xx = x_cache_[x] * zz;
+          tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
+          tf2::Vector3 base2point = transform_map2base * map2point;
+          // Raytrace from the sensor origin to the target point
+          octomap::KeyRay ray;
+          const octomap::point3d target_point(map2point.getX(), map2point.getY(), map2point.getZ());
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND &&
+              tree_->computeRayKeys(sensor_origin, target_point, ray))
+          {
+            for (auto& it : ray)
             {
-              zz = (float)raytrace_range_;
-            }
-            float yy = y_cache_[y] * zz;
-            float xx = x_cache_[x] * zz;
-            if (std::isnan(xx) && std::isnan(yy) && std::isnan(zz))
-              continue;
-            /* transform to map frame */
-            tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
-            tf2::Vector3 base2point = transform_map2base * map2point;
-            if (base2point.x() < occupancy_min_x_ || base2point.x() > occupancy_max_x_ ||
-                base2point.y() < occupancy_min_y_ || base2point.y() > occupancy_max_y_ ||
-                base2point.z() < occupancy_min_z_ || base2point.z() > occupancy_max_z_)
-            {
-              continue;
-            }
-            /* Check if the point is within the specified range */
-            if (zz < raytrace_range_)
-            {
-              occupied_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
-            }
-            else
-            {
-              octomap::KeyRay ray;
-              const octomap::point3d target_point(map2point.getX(), map2point.getY(), map2point.getZ());
-              if (tree_->computeRayKeys(sensor_origin, target_point, ray))
+              octomap::point3d it_point = tree_->keyToCoord(it);
+              map2point = tf2::Vector3(it_point.x(), it_point.y(), it_point.z());
+              base2point = transform_map2base * map2point;
+              if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
+                  base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
+                  base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
               {
-                for (auto& it : ray)
-                {
-                  free_cells.insert(it);
-                }
+                free_cells.insert(it);
               }
             }
           }
-          // on far plane or a model point -> remove
-          else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
+          // Fill in the occupied cells
+          if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP ||
+              labels_row[x] == mesh_filter::MeshFilterBase::FAR_CLIP)
           {
-            float zz = input_row[x] * 1e-3;
-            float yy = y_cache_[y] * zz;
-            float xx = x_cache_[x] * zz;
-            if (zz == 0)
-              continue;
-            /* transform to map frame */
+            continue;
+          }
+          else if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
+                   labels_row[x] == mesh_filter::MeshFilterBase::FOREGROUND)
+          {
+            if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
+                base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
+                base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
+            {
+              occupied_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
+            }
+          }
+          else if (labels_row[x] == mesh_filter::MeshFilterBase::MODEL ||
+                   labels_row[x] == mesh_filter::MeshFilterBase::SHADOW)
+          {
             tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
             tf2::Vector3 base2point = transform_map2base * map2point;
-            if (base2point.x() < occupancy_min_x_ || base2point.x() > occupancy_max_x_ ||
-                base2point.y() < occupancy_min_y_ || base2point.y() > occupancy_max_y_ ||
-                base2point.z() < occupancy_min_z_ || base2point.z() > occupancy_max_z_)
+            if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
+                base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
+                base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
             {
-              continue;
+              model_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
             }
-            // add to the list of model cells
-            model_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
           }
         }
       }
@@ -699,68 +694,67 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
     else
     {
       const float* input_row = reinterpret_cast<const float*>(&depth_msg->data[0]);
-
       for (int y = skip_vertical_pixels_; y < h_bound;
            y += compression_ratio_, labels_row += compression_ratio_ * w, input_row += compression_ratio_ * w)
       {
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
-          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
-              labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+          float zz = input_row[x];
+          if (!std::isfinite(zz) || zz <= 0 || zz > raytrace_range_)
           {
-            float zz = input_row[x];
-            if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP)
+            zz = raytrace_range_;
+          }
+          float yy = y_cache_[y] * zz;
+          float xx = x_cache_[x] * zz;
+          tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
+          tf2::Vector3 base2point = transform_map2base * map2point;
+          // Raytrace from the sensor origin to the target point
+          octomap::KeyRay ray;
+          const octomap::point3d target_point(map2point.getX(), map2point.getY(), map2point.getZ());
+          if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND &&
+              tree_->computeRayKeys(sensor_origin, target_point, ray))
+          {
+            for (auto& it : ray)
             {
-              zz = (float)raytrace_range_;
-            }
-            float yy = y_cache_[y] * zz;
-            float xx = x_cache_[x] * zz;
-            if (std::isnan(xx) && std::isnan(yy) && std::isnan(zz))
-              continue;
-            /* transform to map frame */
-            tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
-            tf2::Vector3 base2point = transform_map2base * map2point;
-            if (base2point.x() < occupancy_min_x_ || base2point.x() > occupancy_max_x_ ||
-                base2point.y() < occupancy_min_y_ || base2point.y() > occupancy_max_y_ ||
-                base2point.z() < occupancy_min_z_ || base2point.z() > occupancy_max_z_)
-            {
-              continue;
-            }
-            if (zz < raytrace_range_)
-            {
-              occupied_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
-            }
-            else
-            {
-              octomap::KeyRay ray;
-              const octomap::point3d target_point(map2point.getX(), map2point.getY(), map2point.getZ());
-              if (tree_->computeRayKeys(sensor_origin, target_point, ray))
+              octomap::point3d it_point = tree_->keyToCoord(it);
+              map2point = tf2::Vector3(it_point.x(), it_point.y(), it_point.z());
+              base2point = transform_map2base * map2point;
+              if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
+                  base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
+                  base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
               {
-                for (auto& it : ray)
-                {
-                  free_cells.insert(it);
-                }
+                free_cells.insert(it);
               }
             }
           }
-          else if (labels_row[x] >= mesh_filter::MeshFilterBase::FAR_CLIP)
+          // Fill in the occupied cells
+          if (labels_row[x] == mesh_filter::MeshFilterBase::NEAR_CLIP ||
+              labels_row[x] == mesh_filter::MeshFilterBase::FAR_CLIP)
           {
-            float zz = input_row[x];
-            float yy = y_cache_[y] * zz;
-            float xx = x_cache_[x] * zz;
-            if (zz == 0)
-              continue;
-            /* transform to map frame */
+            continue;
+          }
+          else if (labels_row[x] == mesh_filter::MeshFilterBase::BACKGROUND ||
+                   labels_row[x] == mesh_filter::MeshFilterBase::FOREGROUND)
+          {
+            if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
+                base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
+                base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
+            {
+              occupied_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
+            }
+          }
+          else if (labels_row[x] == mesh_filter::MeshFilterBase::MODEL ||
+                   labels_row[x] == mesh_filter::MeshFilterBase::SHADOW)
+          {
+            // Skip points that are outside of the bounding box
             tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
             tf2::Vector3 base2point = transform_map2base * map2point;
-            if (base2point.x() < occupancy_min_x_ || base2point.x() > occupancy_max_x_ ||
-                base2point.y() < occupancy_min_y_ || base2point.y() > occupancy_max_y_ ||
-                base2point.z() < occupancy_min_z_ || base2point.z() > occupancy_max_z_)
+            if (base2point.x() > occupancy_min_x_ && base2point.x() < occupancy_max_x_ &&
+                base2point.y() > occupancy_min_y_ && base2point.y() < occupancy_max_y_ &&
+                base2point.z() > occupancy_min_z_ && base2point.z() < occupancy_max_z_)
             {
-              continue;
+              model_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
             }
-            // add to the list of model cells
-            model_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
           }
         }
       }
@@ -774,10 +768,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   }
   tree_->unlockRead();
 
-  /* cells that overlap with the model are not occupied */
-  for (const octomap::OcTreeKey& model_cell : model_cells)
-    occupied_cells.erase(model_cell);
-  /* cells that are outside of the bounding box are not occupied */
+  /* cells that are outside of the bounding box will be removed */
   for (octomap::OcTree::leaf_iterator it = tree_->begin_leafs(), end = tree_->end_leafs(); it != end; ++it)
   {
     octomap::OcTreeKey key = it.getKey();
@@ -793,16 +784,16 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
   tree_->lockWrite();
   try
   {
-    /* mark all occupied cells */
-    for (const octomap::OcTreeKey& occupied_cell : occupied_cells)
-    {
-      tree_->updateNode(occupied_cell, true);
-    }
     /* mark all free cells */
     for (const octomap::OcTreeKey& free_cell : free_cells)
     {
       tree_->updateNode(free_cell, false);
     };
+    /* mark all occupied cells */
+    for (const octomap::OcTreeKey& occupied_cell : occupied_cells)
+    {
+      tree_->updateNode(occupied_cell, true);
+    }
     /* remove all cells outside of the bounding box */
     for (const octomap::OcTreeKey& outside_cell : outside_cells)
     {
