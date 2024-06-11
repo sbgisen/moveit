@@ -660,6 +660,8 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       {
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
+          if (ros::isShuttingDown())
+            return;
           float zz = (float)input_row[x] * 1e-3;
           if (!std::isfinite(zz) || zz <= 0 || zz > raytrace_range_)
           {
@@ -682,7 +684,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
           const octomap::point3d ray_target_point(ray_target_map2point.getX(), ray_target_map2point.getY(),
                                                   ray_target_map2point.getZ());
           octomap::KeyRay ray;
-          if (tree_->computeRayKeys(sensor_origin, ray_target_point, ray))
+          if (ray_zz > 0 && tree_->computeRayKeys(sensor_origin, ray_target_point, ray))
           {
             for (auto& it : ray)
             {
@@ -736,6 +738,8 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       {
         for (int x = skip_horizontal_pixels_; x < w_bound; x += compression_ratio_)
         {
+          if (ros::isShuttingDown())
+            return;
           float zz = input_row[x];
           if (!std::isfinite(zz) || zz <= 0 || zz > raytrace_range_)
           {
@@ -758,7 +762,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
           const octomap::point3d ray_target_point(ray_target_map2point.getX(), ray_target_map2point.getY(),
                                                   ray_target_map2point.getZ());
           octomap::KeyRay ray;
-          if (tree_->computeRayKeys(sensor_origin, ray_target_point, ray))
+          if (ray_zz > 0 && tree_->computeRayKeys(sensor_origin, ray_target_point, ray))
           {
             for (auto& it : ray)
             {
