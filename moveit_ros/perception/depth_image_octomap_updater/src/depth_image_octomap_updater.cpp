@@ -585,11 +585,11 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       unsigned int visualize_color = 0;
       if (labels[i] == mesh_filter::MeshFilterBase::NEAR_CLIP)
       {
-        visualize_color = 0x000000FF;
+        visualize_color = 0xFF0000FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::FOREGROUND)
       {
-        visualize_color = 0x202020FF;
+        visualize_color = 0x00FF00FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::MODEL)
       {
@@ -597,20 +597,20 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::SHADOW)
       {
-        visualize_color = 0x808080FF;
+        visualize_color = 0xFF00FFFF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::BACKGROUND)
       {
-        visualize_color = 0xA0A0A0FF;
+        visualize_color = 0xFFFF00FF;
       }
       else if (labels[i] == mesh_filter::MeshFilterBase::FAR_CLIP)
       {
-        visualize_color = 0xFFFFFFFF;
+        visualize_color = 0x00FFFFFF;
       }
       else
       {
         // Red
-        visualize_color = 0xFF0000FF;
+        visualize_color = 0xFFFFFFFF;
       }
 
       if (HOST_IS_BIG_ENDIAN)
