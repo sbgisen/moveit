@@ -187,10 +187,12 @@ const std::string mesh_filter::StereoCameraModel::FILTER_FRAGMENT_SHADER_SOURCE 
     "    else if (diff < threshold)"
     "    {"
     "      gl_FragColor = vec4 (modelLabel, 0, 0, 0);"
+    "      gl_FragDepth = 0.0;"
     "    }"
     "    else"
     "    {"
     "      gl_FragColor = vec4 (shadowLabel, 0, 0, 0);"
+    "      gl_FragDepth = 0.0;"
     "    }"
     "  }"
     "}";
