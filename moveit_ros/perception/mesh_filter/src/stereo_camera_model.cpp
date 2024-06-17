@@ -143,60 +143,64 @@ const std::string mesh_filter::StereoCameraModel::FILTER_VERTEX_SHADER_SOURCE =
     "}";
 
 const std::string mesh_filter::StereoCameraModel::FILTER_FRAGMENT_SHADER_SOURCE =
-    "#version 120\n"
-    "uniform sampler2D sensor;"
-    "uniform sampler2D depth;"
-    "uniform sampler2D label;"
-    "uniform float near_mesh;"
-    "uniform float far_mesh;"
-    "uniform float near_points;"
-    "uniform float far_points;"
-    "uniform float shadow_threshold;"
-    "const float nearClipLabel = 0;"
-    "const float foregroundLabel = 1.0 / 255.0;"
-    "const float modelLabel = 2.0 / 255.0;"
-    "const float shadowLabel = 3.0 / 255.0;"
-    "const float backgroundLabel = 4.0 / 255.0;"
-    "const float farClipLabel = 5.0 / 255.0;"
-    "float f_n_mesh = far_mesh - near_mesh;"
-    "float f_n_points = far_points - near_points;"
-    "float threshold = shadow_threshold / f_n_mesh;"
-    "void main()"
-    "{"
-    "  float sens_range = float(texture2D(sensor, gl_TexCoord[0].st));"
-    "  gl_FragDepth = sens_range;"
-    "  if (sens_range < 0.000001)"
-    "  {"
-    "    gl_FragColor = vec4 (nearClipLabel, 0, 0, 0);"
-    "    gl_FragDepth = 0.0;"
-    "  }"
-    "  else if (sens_range > 0.999999)"
-    "  {"
-    "    gl_FragColor = vec4 (farClipLabel, 0, 0, 0);"
-    "  }"
-    "  else"
-    "  {"
-    "    float scaled_sens_range = ((sens_range * f_n_points + near_points) - near_mesh) / f_n_mesh;"
-    "    float model_depth = float(texture2D(depth, gl_TexCoord[0].st));"
-    "    float model_range = model_depth * near_mesh / (far_mesh - model_depth * f_n_mesh);"
-    "    float diff = scaled_sens_range - model_range;"
-    "    if (model_range < 0.000001 || model_range > 0.999999)"
-    "    {"
-    "      gl_FragColor = vec4 (backgroundLabel, 0, 0, 0);"
-    "    }"
-    "    else if (diff < 0.0)"
-    "    {"
-    "      gl_FragColor = vec4 (foregroundLabel, 0, 0, 0);"
-    "    }"
-    "    else if (diff < threshold)"
-    "    {"
-    "      gl_FragColor = vec4 (modelLabel, 0, 0, 0);"
-    "      gl_FragDepth = 0.0;"
-    "    }"
-    "    else"
-    "    {"
-    "      gl_FragColor = vec4 (shadowLabel, 0, 0, 0);"
-    "      gl_FragDepth = 0.0;"
-    "    }"
-    "  }"
-    "}";
+    R"(
+    #version 120
+    uniform sampler2D sensor;
+    uniform sampler2D depth;
+    uniform sampler2D label;
+    uniform float near_mesh;
+    uniform float far_mesh;
+    uniform float near_points;
+    uniform float far_points;
+    uniform float shadow_threshold;
+
+    const float nearClipLabel = 0.0;
+    const float foregroundLabel = 1.0 / 255.0;
+    const float modelLabel = 2.0 / 255.0;
+    const float shadowLabel = 3.0 / 255.0;
+    const float backgroundLabel = 4.0 / 255.0;
+    const float farClipLabel = 5.0 / 255.0;
+
+    float calculateScaledSensRange(float sens_range, float f_n_points, float near_points, float near_mesh, float f_n_mesh) {
+        return ((sens_range * f_n_points + near_points) - near_mesh) / f_n_mesh;
+    }
+
+    float calculateModelRange(float model_depth, float near_mesh, float far_mesh, float f_n_mesh) {
+        return model_depth * near_mesh / (far_mesh - model_depth * f_n_mesh);
+    }
+
+    void setFragmentColor(float color, float depth) {
+        gl_FragColor = vec4(color, 0.0, 0.0, 0.0);
+        gl_FragDepth = depth;
+    }
+
+    void main() {
+        float f_n_mesh = far_mesh - near_mesh;
+        float f_n_points = far_points - near_points;
+        float threshold = shadow_threshold / f_n_mesh;
+
+        float sens_range = float(texture2D(sensor, gl_TexCoord[0].st));
+        gl_FragDepth = sens_range;
+
+        if (sens_range < 0.000001) {
+            setFragmentColor(nearClipLabel, 0.0);
+        } else if (sens_range > 0.999999) {
+            setFragmentColor(farClipLabel, sens_range);
+        } else {
+            float scaled_sens_range = calculateScaledSensRange(sens_range, f_n_points, near_points, near_mesh, f_n_mesh);
+            float model_depth = float(texture2D(depth, gl_TexCoord[0].st));
+            float model_range = calculateModelRange(model_depth, near_mesh, far_mesh, f_n_mesh);
+            float diff = scaled_sens_range - model_range;
+
+            if (model_range < 0.000001 || model_range > 0.999999) {
+                setFragmentColor(backgroundLabel, sens_range);
+            } else if (diff < 0.0) {
+                setFragmentColor(foregroundLabel, sens_range);
+            } else if (diff < threshold) {
+                setFragmentColor(modelLabel, 0.0);
+            } else {
+                setFragmentColor(shadowLabel, 0.0);
+            }
+        }
+    }
+    )";
