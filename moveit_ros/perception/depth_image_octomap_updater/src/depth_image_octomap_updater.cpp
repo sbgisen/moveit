@@ -716,8 +716,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
               occupied_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
             }
           }
-          else if (labels_row[x] == mesh_filter::MeshFilterBase::MODEL ||
-                   labels_row[x] == mesh_filter::MeshFilterBase::SHADOW)
+          else if (labels_row[x] == mesh_filter::MeshFilterBase::MODEL && enable_model_clearing_)
           {
             tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
             tf2::Vector3 base2point = transform_map2base * map2point;
@@ -794,8 +793,7 @@ void DepthImageOctomapUpdater::depthImageCallback(const sensor_msgs::ImageConstP
               occupied_cells.insert(tree_->coordToKey(map2point.getX(), map2point.getY(), map2point.getZ()));
             }
           }
-          else if (labels_row[x] == mesh_filter::MeshFilterBase::MODEL ||
-                   labels_row[x] == mesh_filter::MeshFilterBase::SHADOW)
+          else if (labels_row[x] == mesh_filter::MeshFilterBase::MODEL && enable_model_clearing_)
           {
             tf2::Vector3 map2point = transform_sensor2map * tf2::Vector3(xx, yy, zz);
             tf2::Vector3 base2point = transform_map2base * map2point;
