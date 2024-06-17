@@ -38,10 +38,13 @@
 #include <moveit/mesh_filter/gl_renderer.h>
 
 mesh_filter::StereoCameraModel::Parameters::Parameters(unsigned width, unsigned height,
-                                                       float near_clipping_plane_distance,
-                                                       float far_clipping_plane_distance, float fx, float fy, float cx,
+                                                       float near_clipping_mesh_distance,
+                                                       float far_clipping_mesh_distance,
+                                                       float near_clipping_points_distance,
+                                                       float far_clipping_points_distance, float fx, float fy, float cx,
                                                        float cy, float base_line, float disparity_resolution)
-  : SensorModel::Parameters(width, height, near_clipping_plane_distance, far_clipping_plane_distance)
+  : SensorModel::Parameters(width, height, near_clipping_mesh_distance, far_clipping_mesh_distance,
+                            near_clipping_points_distance, far_clipping_points_distance)
   , fx_(fx)
   , fy_(fy)
   , cx_(cx)
@@ -56,8 +59,9 @@ mesh_filter::StereoCameraModel::Parameters::~Parameters() = default;
 
 mesh_filter::SensorModel::Parameters* mesh_filter::StereoCameraModel::Parameters::clone() const
 {
-  return new StereoCameraModel::Parameters(width_, height_, near_clipping_plane_distance_, far_clipping_plane_distance_,
-                                           fx_, fy_, cx_, cy_, base_line_, disparity_resolution_);
+  return new StereoCameraModel::Parameters(width_, height_, near_clipping_mesh_distance_, far_clipping_mesh_distance_,
+                                           near_clipping_points_distance_, far_clipping_points_distance_, fx_, fy_, cx_,
+                                           cy_, base_line_, disparity_resolution_);
 }
 
 void mesh_filter::StereoCameraModel::Parameters::setCameraParameters(float fx, float fy, float cx, float cy)
@@ -80,15 +84,9 @@ void mesh_filter::StereoCameraModel::Parameters::setDisparityResolution(float di
 
 void mesh_filter::StereoCameraModel::Parameters::setRenderParameters(GLRenderer& renderer) const
 {
-  renderer.setClippingRange(near_clipping_plane_distance_, far_clipping_plane_distance_);
+  renderer.setClippingRange(near_clipping_mesh_distance_, far_clipping_mesh_distance_);
   renderer.setBufferSize(width_, height_);
   renderer.setCameraParameters(fx_, fy_, cx_, cy_);
-  // GLuint padding_coefficients_id = glGetUniformLocation (renderer.getProgramID (), "padding_coefficients");
-
-  //  // set device dependent padding coefficients
-  //  glUniform3f (padding_coefficients_id, padding_coefficients_1_ * padding_scale_,
-  //                                        padding_coefficients_2_ * padding_scale_,
-  //                                        padding_coefficients_3_ * padding_scale_  + padding_offset_ );
 }
 
 const Eigen::Vector3f& mesh_filter::StereoCameraModel::Parameters::getPaddingCoefficients() const
@@ -98,17 +96,19 @@ const Eigen::Vector3f& mesh_filter::StereoCameraModel::Parameters::getPaddingCoe
 
 void mesh_filter::StereoCameraModel::Parameters::setFilterParameters(GLRenderer& renderer) const
 {
-  glUniform1f(glGetUniformLocation(renderer.getProgramID(), "near"), near_clipping_plane_distance_);
-  glUniform1f(glGetUniformLocation(renderer.getProgramID(), "far"), far_clipping_plane_distance_);
+  glUniform1f(glGetUniformLocation(renderer.getProgramID(), "near_mesh"), near_clipping_mesh_distance_);
+  glUniform1f(glGetUniformLocation(renderer.getProgramID(), "far_mesh"), far_clipping_mesh_distance_);
+  glUniform1f(glGetUniformLocation(renderer.getProgramID(), "near_points"), near_clipping_points_distance_);
+  glUniform1f(glGetUniformLocation(renderer.getProgramID(), "far_points"), far_clipping_points_distance_);
 
-  renderer.setClippingRange(near_clipping_plane_distance_, far_clipping_plane_distance_);
+  renderer.setClippingRange(near_clipping_mesh_distance_, far_clipping_mesh_distance_);
   renderer.setBufferSize(width_, height_);
   renderer.setCameraParameters(fx_, fy_, cx_, cy_);
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 const mesh_filter::StereoCameraModel::Parameters& mesh_filter::StereoCameraModel::REGISTERED_PSDK_PARAMS =
-    mesh_filter::StereoCameraModel::Parameters(640, 480, 0.4, 10.0, 525, 525, 319.5, 239.5, 0.075, 0.125);
+    mesh_filter::StereoCameraModel::Parameters(640, 480, 0.4, 10.0, 0.1, 10.0, 525, 525, 319.5, 239.5, 0.075, 0.125);
 
 const std::string mesh_filter::StereoCameraModel::RENDER_VERTEX_SHADER_SOURCE =
     "#version 120\n"
@@ -147,8 +147,10 @@ const std::string mesh_filter::StereoCameraModel::FILTER_FRAGMENT_SHADER_SOURCE 
     "uniform sampler2D sensor;"
     "uniform sampler2D depth;"
     "uniform sampler2D label;"
-    "uniform float near;"
-    "uniform float far;"
+    "uniform float near_mesh;"
+    "uniform float far_mesh;"
+    "uniform float near_points;"
+    "uniform float far_points;"
     "uniform float shadow_threshold;"
     "const float nearClipLabel = 0;"
     "const float foregroundLabel = 1.0 / 255.0;"
@@ -156,8 +158,9 @@ const std::string mesh_filter::StereoCameraModel::FILTER_FRAGMENT_SHADER_SOURCE 
     "const float shadowLabel = 3.0 / 255.0;"
     "const float backgroundLabel = 4.0 / 255.0;"
     "const float farClipLabel = 5.0 / 255.0;"
-    "float f_n = far - near;"
-    "float threshold = shadow_threshold / f_n;"
+    "float f_n_mesh = far_mesh - near_mesh;"
+    "float f_n_points = far_points - near_points;"
+    "float threshold = shadow_threshold / f_n_mesh;"
     "void main()"
     "{"
     "  float sens_range = float(texture2D(sensor, gl_TexCoord[0].st));"
@@ -173,9 +176,10 @@ const std::string mesh_filter::StereoCameraModel::FILTER_FRAGMENT_SHADER_SOURCE 
     "  }"
     "  else"
     "  {"
+    "    float scaled_sens_range = sens_range * f_n_points + near_points;"
     "    float model_depth = float(texture2D(depth, gl_TexCoord[0].st));"
-    "    float model_range = model_depth * near / (far - model_depth * f_n);"
-    "    float diff = sens_range - model_range;"
+    "    float model_range = model_depth * near_mesh / (far_mesh - model_depth * f_n_mesh);"
+    "    float diff = scaled_sens_range - model_range;"
     "    if (model_range < 0.0 || model_range > 1.0)"
     "    {"
     "      gl_FragColor = vec4 (backgroundLabel, 0, 0, 0);"

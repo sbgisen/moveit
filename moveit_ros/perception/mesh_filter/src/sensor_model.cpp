@@ -39,12 +39,15 @@
 
 mesh_filter::SensorModel::~SensorModel() = default;
 
-mesh_filter::SensorModel::Parameters::Parameters(unsigned width, unsigned height, float near_clipping_plane_distance,
-                                                 float far_clipping_plane_distance)
+mesh_filter::SensorModel::Parameters::Parameters(unsigned width, unsigned height, float near_clipping_mesh_distance,
+                                                 float far_clipping_mesh_distance, float near_clipping_points_distance,
+                                                 float far_clipping_points_distance)
   : width_(width)
   , height_(height)
-  , far_clipping_plane_distance_(far_clipping_plane_distance)
-  , near_clipping_plane_distance_(near_clipping_plane_distance)
+  , far_clipping_mesh_distance_(far_clipping_mesh_distance)
+  , near_clipping_mesh_distance_(near_clipping_mesh_distance)
+  , far_clipping_points_distance_(far_clipping_points_distance)
+  , near_clipping_points_distance_(near_clipping_points_distance)
 {
 }
 
@@ -56,16 +59,29 @@ void mesh_filter::SensorModel::Parameters::setImageSize(unsigned width, unsigned
   height_ = height;
 }
 
+void mesh_filter::SensorModel::Parameters::setMeshRange(float near, float far)
+{
+  if (near <= 0)
+    throw std::runtime_error("Near mesh-clipping plane distance needs to be larger than zero!");
+
+  if (far <= near)
+    throw std::runtime_error("Far mesh-clipping plane distance must be larger than the near clipping plane distance!");
+
+  near_clipping_mesh_distance_ = near;
+  far_clipping_mesh_distance_ = far;
+}
+
 void mesh_filter::SensorModel::Parameters::setDepthRange(float near, float far)
 {
   if (near <= 0)
-    throw std::runtime_error("Near clipping plane distance needs to be larger than zero!");
+    throw std::runtime_error("Near points-clipping plane distance needs to be larger than zero!");
 
   if (far <= near)
-    throw std::runtime_error("Far clipping plane distance must be larger than the near clipping plane distance!");
+    throw std::runtime_error(
+        "Far points-clipping plane distance must be larger than the near clipping plane distance!");
 
-  near_clipping_plane_distance_ = near;
-  far_clipping_plane_distance_ = far;
+  near_clipping_points_distance_ = near;
+  far_clipping_points_distance_ = far;
 }
 
 unsigned mesh_filter::SensorModel::Parameters::getWidth() const
@@ -78,14 +94,24 @@ unsigned mesh_filter::SensorModel::Parameters::getHeight() const
   return height_;
 }
 
-float mesh_filter::SensorModel::Parameters::getNearClippingPlaneDistance() const
+float mesh_filter::SensorModel::Parameters::getNearClippingMeshDistance() const
 {
-  return near_clipping_plane_distance_;
+  return near_clipping_mesh_distance_;
 }
 
-float mesh_filter::SensorModel::Parameters::getFarClippingPlaneDistance() const
+float mesh_filter::SensorModel::Parameters::getFarClippingMeshDistance() const
 {
-  return far_clipping_plane_distance_;
+  return far_clipping_mesh_distance_;
+}
+
+float mesh_filter::SensorModel::Parameters::getNearClippingPointsDistance() const
+{
+  return near_clipping_points_distance_;
+}
+
+float mesh_filter::SensorModel::Parameters::getFarClippingPointsDistance() const
+{
+  return far_clipping_points_distance_;
 }
 
 namespace
@@ -105,8 +131,8 @@ inline bool isAligned16(const void* pointer)
 void mesh_filter::SensorModel::Parameters::transformModelDepthToMetricDepth(float* depth) const
 {
 #if HAVE_SSE_EXTENSIONS
-  const __m128 mmNear = _mm_set1_ps(near_clipping_plane_distance_);
-  const __m128 mmFar = _mm_set1_ps(far_clipping_plane_distance_);
+  const __m128 mmNear = _mm_set1_ps(near_clipping_mesh_distance_);
+  const __m128 mmFar = _mm_set1_ps(far_clipping_mesh_distance_);
   const __m128 mmNF = _mm_mul_ps(mmNear, mmFar);
   const __m128 mmF_N = _mm_sub_ps(mmFar, mmNear);
   static const __m128 mmOnes = _mm_set1_ps(1);
@@ -118,8 +144,8 @@ void mesh_filter::SensorModel::Parameters::transformModelDepthToMetricDepth(floa
     // first depth value without SSE until we reach aligned data
     unsigned first = 16 - alignment16(depth);
     unsigned idx;
-    const float near = near_clipping_plane_distance_;
-    const float far = far_clipping_plane_distance_;
+    const float near = near_clipping_mesh_distance_;
+    const float far = far_clipping_mesh_distance_;
     const float nf = near * far;
     const float f_n = far - near;
 
@@ -156,8 +182,8 @@ void mesh_filter::SensorModel::Parameters::transformModelDepthToMetricDepth(floa
 
 #else
   // calculate metric depth values from OpenGL normalized depth buffer
-  const float near = near_clipping_plane_distance_;
-  const float far = far_clipping_plane_distance_;
+  const float near = near_clipping_mesh_distance_;
+  const float far = far_clipping_mesh_distance_;
   const float nf = near * far;
   const float f_n = far - near;
 
@@ -178,8 +204,8 @@ void mesh_filter::SensorModel::Parameters::transformFilteredDepthToMetricDepth(f
 {
 #if HAVE_SSE_EXTENSIONS
   //* SSE version
-  const __m128 mmNear = _mm_set1_ps(near_clipping_plane_distance_);
-  const __m128 mmFar = _mm_set1_ps(far_clipping_plane_distance_);
+  const __m128 mmNear = _mm_set1_ps(near_clipping_points_distance_);
+  const __m128 mmFar = _mm_set1_ps(far_clipping_points_distance_);
   const __m128 mmScale = _mm_sub_ps(mmFar, mmNear);
   float* depthEnd = depth + width_ * height_;
 
@@ -188,8 +214,8 @@ void mesh_filter::SensorModel::Parameters::transformFilteredDepthToMetricDepth(f
     // first depth value without SSE until we reach aligned data
     unsigned first = 16 - alignment16(depth);
     unsigned idx;
-    const float scale = far_clipping_plane_distance_ - near_clipping_plane_distance_;
-    const float offset = near_clipping_plane_distance_;
+    const float scale = far_clipping_points_distance_ - near_clipping_points_distance_;
+    const float offset = near_clipping_points_distance_;
     while (depth < depthEnd && idx++ < first)
       if (*depth != 0 && *depth != 1.0)
         *depth = *depth * scale + offset;
@@ -220,8 +246,8 @@ void mesh_filter::SensorModel::Parameters::transformFilteredDepthToMetricDepth(f
   }
 #else
   const float* depth_end = depth + width_ * height_;
-  const float scale = far_clipping_plane_distance_ - near_clipping_plane_distance_;
-  const float offset = near_clipping_plane_distance_;
+  const float scale = far_clipping_points_distance_ - near_clipping_points_distance_;
+  const float offset = near_clipping_points_distance_;
   while (depth < depth_end)
   {
     // 0 = on near clipping plane -> we used 0 to mark invalid points -> not visible

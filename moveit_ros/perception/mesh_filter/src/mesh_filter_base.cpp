@@ -80,11 +80,11 @@ void mesh_filter::MeshFilterBase::initialize(const std::string& render_vertex_sh
                                              const std::string& filter_fragment_shader)
 {
   mesh_renderer_ = std::make_shared<GLRenderer>(sensor_parameters_->getWidth(), sensor_parameters_->getHeight(),
-                                                sensor_parameters_->getNearClippingPlaneDistance(),
-                                                sensor_parameters_->getFarClippingPlaneDistance());
+                                                sensor_parameters_->getNearClippingMeshDistance(),
+                                                sensor_parameters_->getFarClippingMeshDistance());
   depth_filter_ = std::make_shared<GLRenderer>(sensor_parameters_->getWidth(), sensor_parameters_->getHeight(),
-                                               sensor_parameters_->getNearClippingPlaneDistance(),
-                                               sensor_parameters_->getFarClippingPlaneDistance());
+                                               sensor_parameters_->getNearClippingPointsDistance(),
+                                               sensor_parameters_->getFarClippingPointsDistance());
 
   mesh_renderer_->setShadersFromString(render_vertex_shader, render_fragment_shader);
   depth_filter_->setShadersFromString(filter_vertex_shader, filter_fragment_shader);
@@ -259,7 +259,8 @@ void mesh_filter::MeshFilterBase::getFilteredDepth(float* depth) const
 
 void mesh_filter::MeshFilterBase::getFilteredLabels(LabelType* labels) const
 {
-  JobPtr job(new FilterJob<void>([&filter = *depth_filter_, labels] { filter.getColorBuffer((unsigned char*)labels); }));
+  JobPtr job(
+      new FilterJob<void>([&filter = *depth_filter_, labels] { filter.getColorBuffer((unsigned char*)labels); }));
   addJob(job);
   job->wait();
 }
@@ -356,7 +357,7 @@ void mesh_filter::MeshFilterBase::doFilter(const void* sensor_data, const int en
   glBindTexture(GL_TEXTURE_2D, sensor_depth_texture_);
 
   float scale =
-      1.0 / (sensor_parameters_->getFarClippingPlaneDistance() - sensor_parameters_->getNearClippingPlaneDistance());
+      1.0 / (sensor_parameters_->getFarClippingPointsDistance() - sensor_parameters_->getNearClippingPointsDistance());
 
   if (encoding == GL_UNSIGNED_SHORT)
     // unsigned shorts shorts will be mapped to the range 0-1 during transfer. Afterwards we can apply another scale +
@@ -367,7 +368,7 @@ void mesh_filter::MeshFilterBase::doFilter(const void* sensor_data, const int en
     glPixelTransferf(GL_DEPTH_SCALE, scale * 65.535);
   else
     glPixelTransferf(GL_DEPTH_SCALE, scale);
-  glPixelTransferf(GL_DEPTH_BIAS, -scale * sensor_parameters_->getNearClippingPlaneDistance());
+  glPixelTransferf(GL_DEPTH_BIAS, -scale * sensor_parameters_->getNearClippingPointsDistance());
 
   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, sensor_parameters_->getWidth(), sensor_parameters_->getHeight(), 0,
                GL_DEPTH_COMPONENT, encoding, sensor_data);

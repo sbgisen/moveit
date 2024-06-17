@@ -59,8 +59,10 @@ public:
      * \brief Constructor
      * \param[in] width width of generated depth maps from this device
      * \param[in] height height of generated depth maps from this device
-     * \param[in] near_clipping_plane_distance distance of near clipping plane
-     * \param[in] far_clipping_plane_distance distance of far clipping plene
+     * \param[in] near_clipping_mesh_distance distance of near clipping plane for meshes
+     * \param[in] far_clipping_mesh_distance distance of far clipping plane for meshes
+     * \param[in] near_clipping_points_distance distance of near clipping plane for points
+     * \param[in] far_clipping_points_distance distance of far clipping plane for points
      * \param[in] fx focal length in x-direction
      * \param[in] fy focal length in y-direction
      * \param[in] cx x component of principal point
@@ -68,9 +70,10 @@ public:
      * \param[in] base_line the distance in meters used to determine disparity values
      * \param[in] disparity_resolution resolution/quantization of disparity values in pixels
      */
-    Parameters(unsigned width, unsigned height, float near_clipping_plane_distance, float far_clipping_plane_distance,
-               float fx, float fy, float cx, float cy, float base_line, float disparity_resolution);
-    /** \brief Descturctor*/
+    Parameters(unsigned width, unsigned height, float near_clipping_mesh_distance, float far_clipping_mesh_distance,
+               float near_clipping_points_distance, float far_clipping_points_distance, float fx, float fy, float cx,
+               float cy, float base_line, float disparity_resolution);
+    /** \brief Destructor*/
     ~Parameters() override;
 
     /**
